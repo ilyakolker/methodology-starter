@@ -1,0 +1,55 @@
+import { test as setup } from '@playwright/test'
+import { createClient } from '@supabase/supabase-js'
+import { readFileSync, existsSync } from 'fs'
+import { resolve } from 'path'
+
+const AUTH_FILE = 'e2e/.auth/user.json'
+
+function readEnvFile(path: string): Record<string, string> {
+  if (!existsSync(path)) return {}
+  const content = readFileSync(path, 'utf-8')
+  const out: Record<string, string> = {}
+  for (const line of content.split('\n')) {
+    const m = line.match(/^([A-Z_]+)=(.*)$/)
+    if (m) out[m[1]] = m[2]
+  }
+  return out
+}
+
+setup('authenticate test user', async ({ page, context }) => {
+  const fileEnv = readEnvFile(resolve(process.cwd(), 'e2e/.test-user.env'))
+  const email = fileEnv.TEST_USER_EMAIL ?? process.env.TEST_USER_EMAIL ?? '<TEST_USER_EMAIL>'
+  const password = fileEnv.TEST_USER_PASSWORD ?? process.env.TEST_USER_PASSWORD ?? '<TEST_USER_PASSWORD>'
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:54321'
+  const supabaseAnon = process.env.VITE_SUPABASE_ANON_KEY ?? ''
+  if (!supabaseAnon) {
+    throw new Error('VITE_SUPABASE_ANON_KEY must be set in the test env (read from .env.local).')
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnon)
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error || !data.session) {
+    throw new Error(`Auth setup failed for ${email}: ${error?.message ?? 'no session returned'}`)
+  }
+
+  await page.goto('/')
+
+  // Inject the session into localStorage so the FE Supabase client picks it up.
+  // Local Supabase URL is http://127.0.0.1:54321 → key prefix is sb-127-auth-token (verify against your supabase-js version if signed-in tests fail).
+  await page.evaluate((session) => {
+    const key = 'sb-127-auth-token'
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        expires_at: session.expires_at,
+        token_type: session.token_type,
+        user: session.user,
+      })
+    )
+  }, data.session)
+
+  await context.storageState({ path: AUTH_FILE })
+})

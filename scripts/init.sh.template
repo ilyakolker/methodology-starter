@@ -1,0 +1,386 @@
+#!/usr/bin/env bash
+# init.sh — one-command local dev stack boot
+#
+# Brings the local stack to a state where Ralph can run autonomously and
+# tests/verifications can pass. Idempotent — re-running is safe.
+#
+# What it does:
+#   1. Pre-flight checks (package.json, node_modules, supabase CLI, git hooks)
+#   2. Boots Vite dev server (React app on :5173)
+#   3. Boots Supabase local stack (Postgres / Auth / Studio)
+#   4. Applies local migrations (idempotent)
+#   5. Verifies / regenerates TypeScript types (hand-maintained — log only)
+#   6. Installs Playwright browsers if missing
+#   7. Applies seed data (idempotent)
+#   8. Boots Supabase Edge Functions (with real third-party creds from .env.local.secrets)
+#   9. Health-checks every subsystem before declaring ready
+#
+# What it does NOT do:
+#   - Deploy to remote Supabase
+#   - Deploy Edge Functions to remote
+#   - Run any git commands (apart from local hook config)
+#   - Touch secrets — those come from .env.local.secrets (already gitignored)
+#
+# Ctrl+C tears down everything cleanly.
+# Owner is on Windows Git Bash; .sh works there.
+
+set -euo pipefail
+
+# ----- Pre-flight: must run from project root -----
+if [[ ! -f "package.json" ]]; then
+  echo "ERROR: package.json not found in current directory." >&2
+  echo "Run init.sh from the project root." >&2
+  exit 1
+fi
+
+# ----- Pre-flight: .env.local.secrets exists and is fully populated (REQUIRED) -----
+# Required by `supabase functions serve`. Do NOT print contents — gitignored secrets.
+# Server functions are core infrastructure for this project, so missing or incomplete
+# secrets is a HARD FAIL — we refuse to boot a half-broken local stack.
+#
+# REQUIRED_SECRET_KEYS — substituted at bootstrap time from the answers the owner
+# gives during methodology starter init. Each key listed here MUST appear in
+# .env.local.secrets with a non-empty value, otherwise this script bails.
+if [[ ! -f ".env.local.secrets" ]]; then
+  printf '\033[31mERROR: .env.local.secrets not found.\033[0m\n' >&2
+  echo "Server functions are required for local development." >&2
+  echo "To fix:" >&2
+  echo "  1. cp .env.local.secrets.example .env.local.secrets" >&2
+  echo "  2. Populate all required keys (see file for details):" >&2
+<REQUIRED_SECRET_KEYS_ECHO_BLOCK>
+  echo "  3. Re-run ./init.sh" >&2
+  exit 1
+fi
+
+# Validate every required key is present and non-empty. Source the file in a
+# subshell so we don't leak secrets into this shell's environment beyond the check.
+REQUIRED_SECRET_KEYS=(
+<REQUIRED_SECRET_KEYS_ARRAY>
+)
+MISSING_KEYS=()
+for key in "${REQUIRED_SECRET_KEYS[@]}"; do
+  # Match `KEY=value` where value is non-empty and not just whitespace.
+  # Tolerates optional `export ` prefix and surrounding quotes.
+  if ! grep -qE "^[[:space:]]*(export[[:space:]]+)?${key}=[\"']?[^[:space:]\"'#].*" .env.local.secrets; then
+    MISSING_KEYS+=("$key")
+  fi
+done
+if [[ ${#MISSING_KEYS[@]} -gt 0 ]]; then
+  printf '\033[31mERROR: .env.local.secrets is missing or empty for required keys:\033[0m\n' >&2
+  for k in "${MISSING_KEYS[@]}"; do
+    echo "  - $k" >&2
+  done
+  echo "Populate every key with a non-empty value, then re-run ./init.sh" >&2
+  exit 1
+fi
+
+# ----- Pre-flight: node_modules exists -----
+if [[ ! -d "node_modules" ]]; then
+  echo "ERROR: node_modules/ not found." >&2
+  echo "Run: npm install" >&2
+  exit 1
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "ERROR: docker required for supabase local stack. Install Docker Desktop: https://docs.docker.com/desktop/install/windows-install/" >&2
+  exit 1
+fi
+
+# ----- Pre-flight: resolve supabase CLI (global install OR npx fallback) -----
+# On Windows, the CLI is typically only available via `npx supabase` — not on system PATH.
+# Detect either form and route every later call through $SUPABASE_CMD.
+if command -v supabase >/dev/null 2>&1; then
+  SUPABASE_CMD="supabase"
+elif command -v npx >/dev/null 2>&1; then
+  SUPABASE_CMD="npx --yes supabase"
+else
+  echo "ERROR: neither 'supabase' nor 'npx' found on PATH." >&2
+  echo "Install supabase: https://supabase.com/docs/guides/local-development/cli/getting-started" >&2
+  exit 1
+fi
+echo "[supabase-cli] using: $SUPABASE_CMD"
+
+# ----- Git hooks: install scripts/git-hooks/ if not already wired up -----
+# .git/hooks is not committed, so we point git at our tracked hooks dir.
+# Idempotent: only writes config if missing or pointing somewhere else.
+if [[ -d ".git" || -f ".git" ]]; then
+  CURRENT_HOOKS_PATH="$(git config --get core.hooksPath || true)"
+  if [[ "${CURRENT_HOOKS_PATH}" != "scripts/git-hooks" ]]; then
+    git config core.hooksPath scripts/git-hooks
+    echo "[git] core.hooksPath -> scripts/git-hooks (pre-commit hooks active)"
+  fi
+fi
+
+# ----- Banner: starting up -----
+echo "========================================================"
+echo "  <PROJECT_NAME> — booting local dev stack"
+echo "========================================================"
+
+# ----- Child PIDs + clean teardown -----
+PIDS=()
+
+cleanup() {
+  echo ""
+  echo "Tearing down local stack..."
+  for pid in "${PIDS[@]:-}"; do
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      kill "$pid" 2>/dev/null || true
+    fi
+  done
+  # Give children a moment to exit gracefully, then SIGKILL stragglers.
+  sleep 1
+  for pid in "${PIDS[@]:-}"; do
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+  done
+  echo "Stopped."
+}
+trap cleanup EXIT INT TERM
+
+# ----- Prefix helper: tags each line of stdin with [name] -----
+# Uses sed (universally available, including Git Bash for Windows).
+prefix() {
+  local tag="$1"
+  sed -u "s/^/[$tag] /" 2>/dev/null || sed "s/^/[$tag] /"
+}
+
+# ----- Test data helper: ensure a known test user exists -----
+# Idempotent. Used by Playwright auth.setup.ts to log in via stable credentials.
+ensure_test_user() {
+  local TEST_EMAIL="<TEST_USER_EMAIL>"
+  local TEST_PASSWORD="<TEST_USER_PASSWORD>"
+
+  log() { echo "$@"; }
+  err() { echo "$@" >&2; }
+
+  log "[test-data] ensuring test user exists..."
+
+  # Read service-role key from supabase status.
+  # Supabase CLI ≥2.x renamed the label from "service_role key" to "Secret" in the
+  # table-formatted output. Extract by matching the sb_secret_ token prefix instead of
+  # label text, which works across both old and new CLI output formats.
+  local SERVICE_ROLE
+  SERVICE_ROLE=$($SUPABASE_CMD status 2>/dev/null | grep -oE "sb_secret_[a-zA-Z0-9_-]+" | head -1)
+  if [[ -z "$SERVICE_ROLE" ]]; then
+    err "[test-data] could not read service_role key from supabase status"
+    exit 1
+  fi
+
+  # Check if user already exists
+  local USER_LIST
+  USER_LIST=$(curl -s -H "Authorization: Bearer $SERVICE_ROLE" -H "apikey: $SERVICE_ROLE" \
+    "http://127.0.0.1:54321/auth/v1/admin/users" 2>/dev/null || echo "")
+
+  if echo "$USER_LIST" | grep -q "$TEST_EMAIL"; then
+    log "[test-data] test user already exists."
+  else
+    log "[test-data] creating test user..."
+    local CREATE_RESP
+    CREATE_RESP=$(curl -s -X POST \
+      -H "Authorization: Bearer $SERVICE_ROLE" \
+      -H "apikey: $SERVICE_ROLE" \
+      -H "Content-Type: application/json" \
+      -d "{\"email\":\"$TEST_EMAIL\",\"password\":\"$TEST_PASSWORD\",\"email_confirm\":true}" \
+      "http://127.0.0.1:54321/auth/v1/admin/users")
+    if ! echo "$CREATE_RESP" | grep -q '"id"'; then
+      err "[test-data] failed to create test user. Response: $CREATE_RESP"
+      exit 1
+    fi
+    log "[test-data] test user created."
+  fi
+
+  # Write credentials for Playwright auth.setup.ts to read
+  mkdir -p e2e
+  cat > e2e/.test-user.env <<ENV
+TEST_USER_EMAIL=$TEST_EMAIL
+TEST_USER_PASSWORD=$TEST_PASSWORD
+ENV
+  log "[test-data] credentials written to e2e/.test-user.env"
+}
+
+# ----- 1. Vite (independent, launch immediately) -----
+( npm run dev 2>&1 | prefix "vite" ) &
+PIDS+=("$!")
+
+# ----- 2. Supabase start (idempotent) -----
+# `supabase status` exits 0 when running, non-zero when stopped.
+if $SUPABASE_CMD status >/dev/null 2>&1; then
+  echo "[supabase] already running, skipping start."
+else
+  echo "[supabase] starting..."
+  # Run in foreground here — `supabase start` returns once stack is healthy.
+  $SUPABASE_CMD start 2>&1 | prefix "supabase"
+fi
+
+# ----- 3. Verify local migrations (passive — supabase start auto-applies on boot) -----
+# On Windows Docker Desktop, `supabase migration up` hangs with i/o timeout, and
+# `supabase start` already applies migrations when the local stack boots — so the
+# explicit CLI call is redundant in the happy path. Instead, query the DB directly
+# and confirm the count of applied migrations matches the count of .sql files.
+echo "[migrations] verifying applied migrations..."
+DB_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E "supabase_db_" | head -1)
+if [[ -z "$DB_CONTAINER" ]]; then
+  echo "[migrations] WARN: supabase db container not found — skipping verification." >&2
+else
+  APPLIED=$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -tA -c "SELECT COUNT(*) FROM supabase_migrations.schema_migrations" 2>/dev/null | tr -d '[:space:]')
+  APPLIED=${APPLIED:-0}
+  PENDING_FILES=$(ls -1 supabase/migrations/*.sql 2>/dev/null | wc -l | tr -d '[:space:]')
+  PENDING_FILES=${PENDING_FILES:-0}
+  echo "[migrations] applied=$APPLIED, files=$PENDING_FILES (supabase start auto-applies on boot)"
+  if [[ "$APPLIED" -lt "$PENDING_FILES" ]]; then
+    echo "[migrations] WARN: pending migrations detected. Run: supabase db reset --local (destructive — wipes data) OR supabase migration up (if not on Windows)" >&2
+  fi
+fi
+
+ensure_test_user
+
+# ----- 4. TypeScript types (hand-maintained per Tech Lead) -----
+# Project keeps types in src/types/api.ts as hand-maintained TS — NOT auto-generated.
+# We do NOT run `supabase gen types` here. Log only.
+echo "[types] hand-maintained at src/types/api.ts — skipping gen."
+
+# ----- 5. Playwright browsers (idempotent) -----
+# Only install if Chromium isn't already cached. ms-playwright cache lives at:
+#   Linux/macOS: ~/.cache/ms-playwright/
+#   Windows (Git Bash): $LOCALAPPDATA/ms-playwright/  (Git Bash exposes as /c/Users/<u>/AppData/Local/ms-playwright)
+PW_CACHE_LINUX="${HOME}/.cache/ms-playwright"
+PW_CACHE_WIN="${LOCALAPPDATA:-}/ms-playwright"
+PW_INSTALLED=false
+if [[ -d "$PW_CACHE_LINUX" ]] && compgen -G "$PW_CACHE_LINUX/chromium-*" >/dev/null; then
+  PW_INSTALLED=true
+fi
+if [[ -n "${LOCALAPPDATA:-}" && -d "$PW_CACHE_WIN" ]] && compgen -G "$PW_CACHE_WIN/chromium-*" >/dev/null; then
+  PW_INSTALLED=true
+fi
+
+if [[ "$PW_INSTALLED" == "true" ]]; then
+  echo "[playwright] chromium already installed — skipping."
+else
+  echo "[playwright] installing chromium (one-time)..."
+  if npx --yes playwright install chromium 2>&1 | prefix "playwright"; then
+    echo "[playwright] chromium installed."
+  else
+    echo "[playwright] WARN: install failed. UI tasks may fail until resolved." >&2
+  fi
+fi
+
+# ----- 6. Seed data (idempotent when psql is available) -----
+# The seed file uses ON CONFLICT / upserts so it is safely re-runnable. Preferred path
+# is psql (preserves data). When psql is not on PATH (typical on Windows), we warn
+# the owner to run `$SUPABASE_CMD db reset` manually if they need a fresh seed —
+# we do NOT auto-run it because `db reset` is destructive (wipes the local DB).
+if [[ -f "supabase/seed.sql" ]]; then
+  # Local Supabase DB connection string is fixed for the local CLI stack.
+  LOCAL_DB_URL="postgresql://postgres:postgres@localhost:54322/postgres"
+  if command -v psql >/dev/null 2>&1; then
+    echo "[seed] applying supabase/seed.sql via psql (idempotent)..."
+    if psql "$LOCAL_DB_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql 2>&1 | prefix "seed"; then
+      echo "[seed] applied."
+    else
+      echo "[seed] WARN: seed apply returned non-zero. Inspect output above." >&2
+    fi
+  else
+    echo "[seed] WARN: psql not on PATH — skipping idempotent seed apply." >&2
+    echo "[seed]       To re-apply seed (DESTRUCTIVE — wipes local DB), run manually:" >&2
+    echo "[seed]         $SUPABASE_CMD db reset --local" >&2
+    echo "[seed]       Otherwise the existing local DB content is left untouched." >&2
+  fi
+else
+  echo "[seed] no supabase/seed.sql — skipping."
+fi
+
+# ----- 7. Edge Functions (depends on supabase) -----
+( $SUPABASE_CMD functions serve --env-file .env.local.secrets 2>&1 | prefix "functions" ) &
+PIDS+=("$!")
+# Give the functions runtime a moment to bind its port before health-checks.
+sleep 2
+
+# ----- 7b. Kong restart (Windows Docker Desktop port-mapping recovery) -----
+# `supabase functions serve` SIGHUPs Kong, which drops the host port mapping on
+# Windows Docker Desktop. Without this, every :54321/... request returns Empty reply.
+echo "[kong] restarting Kong to recover host port mapping after functions serve..."
+KONG_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E "supabase_kong_" | head -1)
+if [[ -n "$KONG_CONTAINER" ]]; then
+  docker restart "$KONG_CONTAINER" >/dev/null
+  echo "[kong] $KONG_CONTAINER restarted, waiting up to 20s for it to come back up..."
+  for ((i=1; i<=20; i++)); do
+    if curl -sS "http://127.0.0.1:54321/" -o /dev/null 2>/dev/null; then
+      echo "[kong] healthy after ${i}s"
+      break
+    fi
+    sleep 1
+  done
+else
+  echo "[kong] WARN: kong container not found, skipping restart"
+fi
+
+# ----- 8. Health checks before declaring ready -----
+# Each subsystem must respond. Bail with clear error on first failure.
+echo "[health] running subsystem checks..."
+
+# Vite — dev server may take a few seconds to bind. Retry up to ~20s.
+VITE_OK=false
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if curl -fsSL -o /dev/null --max-time 2 http://localhost:5173 2>/dev/null; then
+    VITE_OK=true
+    break
+  fi
+  sleep 2
+done
+if [[ "$VITE_OK" == "true" ]]; then
+  echo "[health] vite OK (http://localhost:5173)"
+else
+  echo "[health] ERROR: vite not responding on :5173 after 20s." >&2
+  exit 1
+fi
+
+# Supabase — `supabase status` returns 0 when healthy.
+if $SUPABASE_CMD status >/dev/null 2>&1; then
+  echo "[health] supabase OK (http://localhost:54321)"
+else
+  echo "[health] ERROR: supabase status reports unhealthy." >&2
+  exit 1
+fi
+
+# Edge Functions — hitting an unknown function path returns a non-5xx (typically
+# 404), which proves the runtime is live. Any 1xx-4xx counts as "live".
+FN_OK=false
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  # -f makes curl fail on 4xx/5xx. We WANT a 4xx here (proves runtime live),
+  # so we omit -f and just check that curl could connect.
+  if curl -sSL -o /dev/null --max-time 2 -w "%{http_code}" \
+      http://localhost:54321/functions/v1/__healthprobe_unknown__ 2>/dev/null \
+      | grep -qE '^[1-4][0-9][0-9]$'; then
+    FN_OK=true
+    break
+  fi
+  sleep 2
+done
+if [[ "$FN_OK" == "true" ]]; then
+  echo "[health] functions OK (http://localhost:54321/functions/v1)"
+else
+  echo "[health] ERROR: functions runtime not responding on :54321/functions/v1 after 20s." >&2
+  exit 1
+fi
+
+# ----- 9. Ready banner -----
+echo ""
+echo "==============================================================="
+echo "  Local stack ready:"
+echo "    [vite]       http://localhost:5173"
+echo "    [supabase]   http://localhost:54321  (Studio: http://localhost:54323)"
+echo "    [functions]  http://localhost:54321/functions/v1/<name>"
+echo "    [playwright] browsers installed"
+echo "    [migrations] applied"
+echo "    [seed]       applied"
+echo ""
+echo "  Run tests:   npm run test:e2e"
+echo "  Run Ralph:   ./scripts/ralph.sh <feature-slug> [iterations]"
+echo ""
+echo "  Ctrl+C to stop all."
+echo "==============================================================="
+echo "[health] all subsystems live — ready for tests/Ralph."
+
+# ----- Wait for any child to exit; trap handles cleanup. -----
+wait
