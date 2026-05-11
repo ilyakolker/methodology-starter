@@ -71,9 +71,18 @@ cp <starter-path>/scripts/ralph.sh <new-project>/scripts/
 cp <starter-path>/scripts/git-hooks/* <new-project>/scripts/git-hooks/
 cp <starter-path>/scripts/init.sh.template <new-project>/init.sh
 cp <starter-path>/e2e/auth.setup.ts.template <new-project>/e2e/auth.setup.ts
+cp <starter-path>/BACKLOG.md.template <new-project>/docs/BACKLOG.md
 ```
 
 Substitute placeholders in init.sh and auth.setup.ts using owner's answers (project name, secrets, test user creds).
+
+### Project backlog
+
+`docs/BACKLOG.md` is where features owner has expressed intent for go BEFORE intake. Don't confuse with `prd.json` (which lives per-feature under `docs/features/<slug>/prd.json` AFTER PM decomposes a spec). Backlog = "we'll build this someday"; prd.json = "this is being built right now."
+
+When owner pastes `feature-plan: <slug>` in chat, PM either:
+- Picks up the slug from BACKLOG.md (with captured context), or
+- Does fresh intake if it's a new ask
 
 ## Step 6 — Initialize project folders
 

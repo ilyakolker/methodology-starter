@@ -1,0 +1,36 @@
+# Project Backlog
+
+Features owner has expressed intent to build but haven't been intaked yet via `feature-plan:`. Each entry has enough context for a future PM run to pick up the work.
+
+When owner is ready to start one of these, they trigger the methodology via `feature-plan: <slug>` and PM does the intake against the captured context.
+
+Statuses:
+- **queued** — captured here, not started
+- **scoping** — PM is running intake / WHY phase right now
+- **in-progress** — prd.json approved, Ralph or manual build running
+- **shipped** — feature live in production
+- **killed** — owner decided not to build (kept here for history)
+
+Edit this file whenever a feature is decomposed, completed, or dropped.
+
+---
+
+## Entry format
+
+Per entry:
+
+### `<feature-slug>` (status)
+
+One-line description.
+
+**Owner's seed:** "verbatim quote from when owner expressed intent"
+
+**Dependencies:** which features must ship first (or "none")
+
+**Locked decisions:** anything owner or roles already decided in prior chats (or "none yet")
+
+**Trigger:** the exact `feature-plan:` line owner pastes when ready
+
+---
+
+(Backlog starts empty. Add entries as owner expresses intent for features that aren't being built right now.)
