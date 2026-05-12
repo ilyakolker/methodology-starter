@@ -148,6 +148,8 @@ If during PROPOSAL or Q&A it becomes clear a feature is too big to fit one why.m
 
 After Tech Lead approves `prd.json`, the build is run by `scripts/ralph.sh` — a loop runner not yet built but designed for: pick the highest-priority `passes: false` task, fire the right build agent (FE or BE based on `category`), the agent implements and self-verifies against the task's `steps`, the agent flips `passes: true`, exits, and the loop picks the next task. The loop stops when every task is green, when it hits a max-iterations safety cap, or when the same task fails twice in a row (stuck — escalate to owner). Owner gates push at the end. Ralph is downstream tooling — the methodology works without it; ralph.sh just automates the worker dispatch step.
 
+Each Ralph iteration consumes the task's pre-baked context bundle (see `methodology/per-task-context-bundles.md`) instead of re-reading the full feature corpus. Tech Lead generates the bundles as Step 7 of the PRD review, so by the time Ralph runs, each task has its own self-sufficient context file referenced via `context_path` in `prd.json`. Features authored before the bundle protocol existed fall back automatically to the legacy mandatory-reading list — no flag day.
+
 ---
 
 ## Linked protocol files
@@ -160,6 +162,7 @@ For the deep dive, each role has its own protocol file. Read these only when you
 - [`docs/methodology/tech-lead-protocol.md`](./methodology/tech-lead-protocol.md)
 - [`docs/methodology/copywriter-protocol.md`](./methodology/copywriter-protocol.md)
 - [`docs/methodology/feature-proposal-template.md`](./methodology/feature-proposal-template.md)
+- [`docs/methodology/per-task-context-bundles.md`](./methodology/per-task-context-bundles.md) — bundle spec for Ralph cost reduction
 
 ---
 

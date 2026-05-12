@@ -1,0 +1,57 @@
+[
+  {
+    "id": "vendor-table-migration",
+    "category": "functional",
+    "description": "Create vendors table with RLS, soft-delete column, and category FK.",
+    "depends_on": [],
+    "files_touched": [
+      "NEW: supabase/migrations/20260512_create_vendors.sql"
+    ],
+    "steps": [
+      "Apply migration locally; assert vendors table exists with id/name/category_id/deleted_at columns.",
+      "Assert RLS enabled and 'vendors_select_active' policy exists.",
+      "Insert one test row; assert SELECT as anon returns it; UPDATE as anon rejected."
+    ],
+    "spec_ref": "docs/features/couple-add-vendor/spec.md#schema",
+    "context_path": "docs/features/couple-add-vendor/tasks/vendor-table-migration.context.md",
+    "passes": false
+  },
+  {
+    "id": "vendor-form-submission-functional",
+    "category": "functional",
+    "description": "POST /vendors creates vendor row and triggers WhatsApp send.",
+    "depends_on": ["vendor-table-migration"],
+    "files_touched": [
+      "NEW: supabase/functions/submit-vendor/index.ts",
+      "src/integrations/supabase/types.ts"
+    ],
+    "steps": [
+      "POST sample payload to /submit-vendor edge function; assert 200 + row inserted.",
+      "Assert whatsapp_send_log has one queued entry for this vendor.",
+      "Assert types.ts regenerated with Vendor row type."
+    ],
+    "spec_ref": "docs/features/couple-add-vendor/spec.md#submission",
+    "context_path": "docs/features/couple-add-vendor/tasks/vendor-form-submission-functional.context.md",
+    "passes": false
+  },
+  {
+    "id": "vendor-form-ui-mobile",
+    "category": "ui",
+    "description": "Vendor add form at 375px — name, phone, category fields visible, ONE submit CTA.",
+    "depends_on": ["vendor-form-submission-functional"],
+    "files_touched": [
+      "src/features/vendors/AddVendorForm.tsx",
+      "src/pages/AddVendor.tsx"
+    ],
+    "steps": [
+      "Playwright navigate to /add-vendor at 375px.",
+      "Screenshot full page.",
+      "Visual assert: ONE primary submit CTA visible (no duplicate header button).",
+      "Visual assert: name/phone/category fields stack vertically.",
+      "Submit valid form; screenshot success state; assert success copy matches spec."
+    ],
+    "spec_ref": "docs/features/couple-add-vendor/spec.md#add-vendor-mobile",
+    "context_path": "docs/features/couple-add-vendor/tasks/vendor-form-ui-mobile.context.md",
+    "passes": false
+  }
+]

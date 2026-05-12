@@ -7,6 +7,7 @@
 - Check 4 (new architectural patterns) is now Tech Lead's call. No owner gate per pattern. Tech Lead writes a 2-3 line rationale; owner only weighs in if Tech Lead asks.
 - Plain-English intros added to every check. The bullets stayed; the wall-of-bullets feel did not.
 - Check 8 sharpened — strict UI/functional category separation. UI tasks must include negative checks. Mixed tasks are split.
+- **NEW Step 7 (BUNDLE)** — after every entry is APPROVE, Tech Lead pre-bakes a per-task context bundle so Ralph reads ~5 KB per iteration instead of the full feature corpus. See `methodology/per-task-context-bundles.md` for the bundle spec.
 
 ---
 
@@ -202,9 +203,77 @@ Structure:
 
 When every entry is APPROVE and the entry-set verdict is APPROVED, write a `## READY` block at the bottom of `prd-review.md` with the date and round count, then reply to PM with a single clear sentence:
 
-> "prd.json for feature <f> is approved for build. <If any Check 6 pass-through flags exist:> Owner approval gate required before remote-DB or deploy steps run on tasks: <ids>."
+> "prd.json for feature <f> entries are all APPROVE. Generating per-task bundles next (Step 7) before handoff."
+
+PM does not start the build yet. Proceed to Step 7 — bundles must be generated before Ralph runs.
+
+---
+
+## Step 7 — BUNDLE (per-task context bundles)
+
+*Why this matters:* Without bundles, every Ralph iteration mandatory-reads `why.md`, `spec.md`, `flow.md`, `flow.png`, `prd-review.md`, `decisions.md`, the full `prd.json`, and `CLAUDE.md` — roughly 200 KB the agent doesn't need to re-read for each task. The content doesn't change between tasks. A pre-baked per-task bundle of ~5 KB lets Ralph read only what THIS task needs. Tech Lead pays the slicing cost once; every subsequent iteration is much cheaper.
+
+Run this step only after Step 6's `## READY` block is written — i.e., every entry is APPROVE and the entry-set verdict is APPROVED. Bundle generation is the last thing you do before handing off to PM for the build.
+
+### What you produce
+
+For each task in `prd.json`, write a self-contained markdown bundle at:
+
+```
+docs/features/<f>/tasks/<task-id>.context.md
+```
+
+Then add a `context_path` field to that task's entry in `prd.json` pointing at the bundle.
+
+The bundle must contain, in this order:
+
+1. **Header** — task id, category, feature slug, one-line description.
+2. **Task entry** — verbatim JSON entry for THIS task (no others), fenced as ```json.
+3. **Spec excerpts** — the section(s) of `spec.md` this task's `spec_ref` points at (and any sibling sections the task explicitly touches). Quoted verbatim. Never the full spec.
+4. **Flow excerpts** — the screen(s) / state(s) / transition(s) this task implements or verifies, quoted from `flow.md`. **Never embed `flow.png`** — describe the relevant slice in prose if it's load-bearing. Vision tokens are expensive.
+5. **Tech Lead notes** — the per-task row from `prd-review.md`: verdict history, check-by-check notes for THIS task only, files_touched additions Tech Lead made during Check 5 cascade-impact, build-time clarifications.
+6. **Cross-cutting decisions** — entries from `decisions.md` (D1, D2, …) **only if they touch this task**. Skip decisions that are project-wide but orthogonal to the task's layer.
+7. **Project rules that apply** — 3-8 lines from `CLAUDE.md` relevant to this task's category. UI: design tokens, icons, RTL, viewports. Functional: RLS-on-every-table, secrets policy, naming. Migration: reversibility, soft-delete, audit-trail. Never paste the whole `CLAUDE.md`.
+8. **Files the agent will touch** — exact paths from `files_touched`, annotated `existing — edit` or `NEW: — create`.
+
+### What you do NOT include
+
+- Other tasks' entries.
+- `why.md` content (already digested through the spec excerpts).
+- The full `prd.json`.
+- `flow.png` or any image.
+- `CLAUDE.md` sections that don't apply to this task's category.
+- Living docs in full (APP_MAP, design-system reference, North Star). Reference specific excerpts only when load-bearing; otherwise the agent reads them on demand.
+
+### Size discipline
+
+- **Aim:** 3-10 KB per bundle.
+- **Hard cap:** 20 KB. A bundle over 20 KB is a signal the task is too big — push back to PM to split it before merging the bundle.
+
+### Validation (mandatory before declaring bundles ready)
+
+For each bundle, run all four:
+
+1. **Standalone check.** Re-read the bundle pretending the rest of `docs/features/<f>/` doesn't exist. Could you do the task with only the bundle + the codebase files it lists? If no, the bundle is incomplete — add what's missing.
+2. **Size check.** `wc -c` < 20480.
+3. **Scope check.** The bundle quotes no other task's entry. Cross-task references go through `depends_on`, not pasted content.
+4. **Image check.** No PNG / image embed in the bundle. Flow excerpts are prose only.
+
+### Handoff
+
+When all bundles pass validation, append a final line to `prd-review.md`:
+
+> Bundles generated for all <N> tasks. Ralph-ready.
+
+Then reply to PM with a single sentence:
+
+> "prd.json + bundles for feature <f> are approved and Ralph-ready. <If any Check 6 pass-through flags exist:> Owner approval gate required before remote-DB or deploy steps run on tasks: <ids>."
 
 PM owns the trigger to start the build pipeline.
+
+### Re-review rounds
+
+If PM revises a task after this step (or owner asks for changes during a later round), regenerate the bundle for that task in the same commit as the prd.json change. Never let `prd.json` describe one thing and the bundle describe another.
 
 ---
 
@@ -217,7 +286,7 @@ PM owns the trigger to start the build pipeline.
 - Approve UI tasks with un-verifiable `steps`.
 - Approve a new architectural pattern without writing the rationale.
 - Skip the read of `why.md` / `spec.md` and review prd.json in isolation.
-- Touch any file outside `docs/features/<f>/prd-review.md`. Tech Lead is read-only on the codebase during this protocol.
+- Touch any file outside `docs/features/<f>/prd-review.md`, the per-task bundles under `docs/features/<f>/tasks/`, and the `context_path` field of `docs/features/<f>/prd.json`. Tech Lead is read-only on the rest of the codebase during this protocol.
 
 ---
 
@@ -226,5 +295,7 @@ PM owns the trigger to start the build pipeline.
 | File | When |
 |---|---|
 | `docs/features/<feature>/prd-review.md` | End of Step 4, appended in Step 5 |
+| `docs/features/<feature>/tasks/<task-id>.context.md` | Step 7, one per task |
+| `context_path` field in `docs/features/<feature>/prd.json` | Step 7, same commit as bundle creation |
 
 Tech Lead does not write `docs/methodology.md` — that's the converged final doc, after all three protocols align.
