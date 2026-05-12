@@ -11,7 +11,7 @@ PM does NOT own: which files in `src/` or `supabase/` exist or get created.
 
 **The failure (verbatim from owner):** "add a rule to no invent anything by the pm new files creating for the app needs to be created by the engineers. pm can say what needed but the files are not the pms area"
 
-**Why this matters:** PM in `couple-add-vendor` prd.json wrote `src/integrations/supabase/types.ts` — a file that doesn't exist (actual path is `src/integrations/supabase.ts` with no subdirectory). Owner caught it. The fabrication pollutes the build plan; an engineer following the prd.json blindly would either create a file that shouldn't exist OR get confused.
+**Why this matters:** PM in a feature's prd.json wrote `src/integrations/<thirdparty>/types.ts` — a file that doesn't exist (actual path is whatever the codebase chose; PM didn't grep first). Owner caught it. The fabrication pollutes the build plan; an engineer following the prd.json blindly would either create a file that shouldn't exist OR get confused.
 
 **The rule:**
 

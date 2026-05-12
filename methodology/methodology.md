@@ -6,7 +6,7 @@
 
 ## What this is
 
-This is how we take an idea from "owner has a thought in chat" to "shipped on Vercel" without losing the why, breaking the codebase, or shipping something nobody asked for. The methodology is project-agnostic — it's a way of working, not a wedding-app thing — but right now it's instantiated for `wedding-app`. The same files, roles, and protocols would work for the next project unchanged.
+This is how we take an idea from "owner has a thought in chat" to "shipped on Vercel" without losing the why, breaking the codebase, or shipping something nobody asked for. The methodology is project-agnostic — it's a way of working, not a wedding-app thing — but was first instantiated for a wedding-vendor matching platform. The same files, roles, and protocols would work for the next project unchanged.
 
 The core idea: every feature passes through a small number of named phases, each owned by exactly one role, each producing exactly one artifact. The next phase can't start until the previous artifact is signed off. Build agents only run after Tech Lead approves the plan. Owner only gates the final commit + push.
 
@@ -44,13 +44,13 @@ Every entry in `prd.json` carries a `category`. The category is now load-bearing
 
 A single user behavior decomposes into ONE functional task (the spine — what changes in state) and N UI tasks (one per screen state or viewport that needs visual verification). UI tasks `depends_on` their functional counterpart. If a behavior touches one screen at one viewport, that's 1 functional + 1 UI = 2 entries. If it touches a form on mobile + desktop and a success screen and an updated stat counter, that's 1 functional + 4 UI = 5 entries.
 
-**Example — vendor submits a quote:**
+**Example — customer places an order:**
 
-- `vendor-quote` — `category: "functional"`. Steps: insert into `quotes`, transition wedding `status_v2`, fire notification, assert row count and status enum.
-- `vendor-quote-page-ui-mobile` — `category: "ui"`, `depends_on: ["vendor-quote"]`. Steps: navigate Playwright to `/v/quote/<token>` at 375px, screenshot, assert form layout, assert ONE submit button visible (no duplicate header CTA), assert RTL field alignment.
-- `vendor-quote-page-ui-desktop` — `category: "ui"`, `depends_on: ["vendor-quote"]`. Steps: same page at 1280px, screenshot, assert two-column layout, assert sticky CTA visible.
-- `vendor-quote-success-ui` — `category: "ui"`, `depends_on: ["vendor-quote"]`. Steps: trigger success state, screenshot, assert confirmation copy, assert no form fields visible.
-- `dashboard-stat-counter-ui` — `category: "ui"`, `depends_on: ["vendor-quote"]`. Steps: load couple dashboard after quote arrives, screenshot, assert counter increment, assert badge visible only when count > 0.
+- `order-checkout-functional` — `category: "functional"`. Steps: POST to checkout endpoint, insert into `orders`, fire receipt notification, assert row inserted and status is `confirmed`.
+- `order-checkout-form-mobile-ui` — `category: "ui"`, `depends_on: ["order-checkout-functional"]`. Steps: navigate Playwright to `/checkout` at 375px, screenshot, assert form fields visible, submit, screenshot success state.
+- `order-checkout-form-desktop-ui` — `category: "ui"`, `depends_on: ["order-checkout-functional"]`. Steps: same page at 1280px, screenshot, assert two-column layout, assert ONE submit button visible (no duplicate CTA).
+- `order-success-confirmation-ui` — `category: "ui"`, `depends_on: ["order-checkout-functional"]`. Steps: trigger success state, screenshot, assert confirmation copy, assert order number and totals visible, assert no form fields visible.
+- `order-history-recent-orders-ui` — `category: "ui"`, `depends_on: ["order-checkout-functional"]`. Steps: load account page after order placed, screenshot, assert new order row visible, assert status badge correct.
 
 Five entries, one chain of `depends_on` from each UI task back to the single functional task. Mixed tasks get rejected at Tech Lead review and split.
 

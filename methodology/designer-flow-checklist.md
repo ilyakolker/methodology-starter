@@ -219,8 +219,8 @@ For each: what's different? Specifically.
 ### Locale / format
 - Are **dates** localized (Hebrew calendar quirks, day-first vs month-first)?
 - Are **currencies** displayed correctly (₪, comma vs dot decimal)?
-- Are **phone numbers** formatted readably (058-454-0085 not +972584540085)?
-- Are **numbers** (Western digits vs Hebrew digits — we use Western for usability)?
+- Are **phone numbers** formatted readably in the local phone convention?
+- Are **numbers** formatted per local convention (some locales use non-Western digits)?
 
 ---
 
