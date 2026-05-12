@@ -20,7 +20,7 @@ This protocol moves Copywriter to the spec phase. Copywriter co-authors `spec.md
 
 This protocol is methodology — it works for any project. Each project has its own brand voice, defined in a project-level voice doc (e.g. `docs/brand-voice.md`) or in the Copywriter agent definition.
 
-For **תארגן לי חתונה**, the voice is: a warm friend who's been through wedding planning. Hebrew, RTL, conversational Israeli — not formal, not slangy, not corporate. Always plural-you (אתם/לכם) addressing the couple. חתן/כלה, not שותף/ה. Active voice. Short. Confident. The full vocabulary table and rules live in `.claude/agents/copywriter.md`.
+For **<PROJECT_NAME>**, the voice is: <describe voice>. The full vocabulary table and rules live in `docs/brand-voice.md` or the project's Copywriter agent definition.
 
 For other projects, swap in their voice doc. The methodology stays the same.
 
@@ -48,7 +48,7 @@ Before drafting a single string, read these:
 
 2. **`docs/features/<f>/flow.md`** — every screen, every state, every edge case. This is your inventory of strings. If Designer listed empty/loading/error/success for screen 3, that's four states, which means four blocks of copy you owe. Edge cases (offline, session expiry, rate limit) are also string-bearing — they each need their own message.
 
-3. **Project voice doc** — `docs/brand-voice.md` if it exists, otherwise the Copywriter agent definition (`.claude/agents/copywriter.md` for wedding-app). Internalize the voice before drafting.
+3. **Project voice doc** — `docs/brand-voice.md` if it exists, otherwise the Copywriter agent definition (at `.claude/agents/copywriter.md`). Internalize the voice before drafting.
 
 4. **Existing copy in adjacent screens** — the screens the user passes through right before and right after this feature. Use Grep to scan for existing terminology. If the rest of the app calls them "ספקים", you don't introduce "נותני שירות" without a reason. Terminology drift is silent and harmful — users notice the inconsistency even when they can't articulate why something feels off.
 
@@ -104,7 +104,7 @@ Quote count badge:
 For LTR-locked content, mark it explicitly:
 
 ```
-Vendor phone display: dir="ltr", format "058-454-0085"
+Phone display: dir="ltr", format per local convention (e.g., "058-XXX-XXXX" for IL, "(555) 123-4567" for US)
 ```
 
 Add a **terminology glossary** section to `spec.md` listing the canonical Hebrew terms this feature uses. This is your contract with the rest of the app — if a future feature touches the same concept, the glossary tells the next Copywriter (or your future self) what term to reuse.

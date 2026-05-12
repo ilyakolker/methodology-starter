@@ -245,12 +245,12 @@ If a single description maps to both kinds of work, split it before handing to T
 }
 ```
 
-**Example — vendor submits a quote** decomposes into five entries:
-1. `vendor-quote` (functional) — insert quote, transition `status_v2`, fire notification.
-2. `vendor-quote-page-ui-mobile` (ui, depends_on `vendor-quote`) — `/v/quote/<token>` at 375px, ONE submit visible.
-3. `vendor-quote-page-ui-desktop` (ui, depends_on `vendor-quote`) — same page at 1280px, sticky CTA visible.
-4. `vendor-quote-success-ui` (ui, depends_on `vendor-quote`) — success screen, no form fields visible.
-5. `dashboard-stat-counter-ui` (ui, depends_on `vendor-quote`) — couple dashboard counter increments, badge visible.
+**Example — customer places an order** decomposes into five entries:
+1. `order-checkout-functional` (functional) — POST to checkout endpoint, insert into `orders`, fire receipt notification.
+2. `order-checkout-form-mobile-ui` (ui, depends_on `order-checkout-functional`) — `/checkout` at 375px, assert form fields, submit, screenshot success state.
+3. `order-checkout-form-desktop-ui` (ui, depends_on `order-checkout-functional`) — same page at 1280px, assert two-column layout, ONE submit visible.
+4. `order-success-confirmation-ui` (ui, depends_on `order-checkout-functional`) — confirmation page, assert order number and totals visible, no form fields.
+5. `order-history-recent-orders-ui` (ui, depends_on `order-checkout-functional`) — account page after order placed, assert new row visible.
 
 ---
 

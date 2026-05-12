@@ -219,7 +219,7 @@ Work on `docs/features/<feature>/spec.md`. PM kicks off; Designer fills the visu
 | Responsive rules | **Designer** | Mobile / tablet / desktop differences |
 | Edge cases | PM (policy) + Designer (UX) | PM decides whether we handle them; Designer specifies how the UI behaves |
 | Every visible Hebrew string | **Copywriter** | Headings, body, CTA labels, helper text, placeholders, toasts, error messages, empty-state copy, plurals, terminology consistency |
-| Terminology glossary | **Copywriter** | Canonical Hebrew terms used across the app (e.g. הצעת מחיר, ספק, חתונה) so this feature stays consistent with the rest |
+| Terminology glossary | **Copywriter** | Canonical terms used across the app (e.g. הצעת מחיר, ספק, חתונה for a wedding app — replace with your project's canonical terms) so this feature stays consistent with the rest |
 
 ### Discipline
 

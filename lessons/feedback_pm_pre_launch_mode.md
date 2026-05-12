@@ -25,11 +25,9 @@ Before running the PROPOSAL phase Q&A, PM determines product stage:
 
 3. **WHY for pre-launch features = owner's product intent.** Frame the WHY as "the owner anticipates this gap because the current product covers X but not Y." Don't fake "observed user pain."
 
-4. **Success metric stays valid** — but framed as a hypothesis ("if 30% of test couples use this when piloting, we keep it") not as a measured signal.
+4. **Success metric stays valid** — but framed as a hypothesis ("if 30% of test users use this when piloting, we keep it") not as a measured signal.
 
 5. **Out-of-scope is sharper in pre-launch** — owner is in WIP mode and easily over-scopes. PM's job is still to cut.
 
 **How to apply:**
-- Default mode for wedding-app today is pre-launch. The product is on Vercel but no real users.
-- Switch to live mode when owner says "we have N real users" or similar signal.
-- The methodology files (`pm-protocol.md`, `feature-proposal-template.md`) need to add this mode-distinction in a future revision pass.
+- Default mode for a new project is pre-launch. Switch to live mode when you have real users.

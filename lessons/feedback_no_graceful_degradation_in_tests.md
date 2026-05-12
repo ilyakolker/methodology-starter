@@ -10,7 +10,7 @@ For local testing setup (init.sh, ralph.sh pre-flight, CI smoke tests), every re
 
 **Owner's pushback (verbatim):** "'Graceful degradation when secrets missing' -> this is playing the system and will 100% fail any test! if the credentials are missing we will not be able to test anything correctly and gracefully say all good."
 
-**The failure pattern:** init.sh was written to "warn and skip Edge Functions if .env.local.secrets is missing." This made the script reach the "ready" banner even when half the stack wasn't running. QA reported PASS because the script reached the banner, but the underlying capability (testing Edge Function flows, sending WhatsApp, vendor quote pipeline) was completely absent.
+**The failure pattern:** init.sh was written to "warn and skip Edge Functions if .env.local.secrets is missing." This made the script reach the "ready" banner even when half the stack wasn't running. QA reported PASS because the script reached the banner, but the underlying capability (testing Edge Function flows, third-party API calls, core business pipelines) was completely absent.
 
 **The rule:**
 

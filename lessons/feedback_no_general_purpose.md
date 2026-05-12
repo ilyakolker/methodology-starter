@@ -13,6 +13,6 @@ Use the right agent for each file type:
 - Hebrew copy review → **copywriter**
 - QA validation reports → **qa-engineer**
 
-**Why:** General-purpose was used to write `tmp/whatsapp-variations.txt` (a task that belonged to be-engineer since it reads from `supabase/functions/`) and triggered `ls 2>$null` and `Test-Path` Bash permission prompts twice. User stopped the session.
+**Why:** General-purpose was used to write `tmp/integration-draft.txt` (a task that belonged to be-engineer since it reads from `supabase/functions/` or equivalent) and triggered `ls 2>$null` and `Test-Path` Bash permission prompts twice. User stopped the session.
 
 **How to apply:** When the task is "write a file with content X", ask which domain owns X and spawn that agent. If it's a content/report file with no clear owner, use be-engineer (they have Write access and don't tend to run directory checks).
