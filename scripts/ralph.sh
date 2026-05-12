@@ -25,18 +25,65 @@ set -euo pipefail
 
 # ---------- args ----------
 DISCARD_PARTIAL=false
+SHOW_HELP=false
 ARGS=()
 for arg in "$@"; do
   case "$arg" in
     --discard-partial) DISCARD_PARTIAL=true ;;
+    --help|-h) SHOW_HELP=true ;;
     *) ARGS+=("$arg") ;;
   esac
 done
 set -- "${ARGS[@]}"
 
+if [[ "$SHOW_HELP" == "true" ]]; then
+  cat <<'HELP'
+ralph.sh -- autonomous build loop for a feature's prd.json
+
+USAGE
+  ./scripts/ralph.sh [--discard-partial] <feature-slug> [max-iterations]
+  ./scripts/ralph.sh --help
+
+EXAMPLES
+  ./scripts/ralph.sh couple-add-vendor 30
+  ./scripts/ralph.sh --discard-partial couple-add-vendor 30
+
+FLAGS
+  --discard-partial  Wipe uncommitted/untracked work before starting (recovery from interrupted runs).
+  --help, -h         Show this help.
+
+WHAT IT DOES
+  1. Reads docs/features/<feature>/prd.json.
+  2. Picks the next passes:false task whose depends_on are all passes:true.
+  3. Fires `claude --print` per iteration; agent does the work, verifies via task steps,
+     flips passes:true, commits, exits.
+  4. Loops until all tasks passed, or max-iterations, or stuck.
+
+PRE-FLIGHT REQUIREMENTS
+  - node on PATH
+  - claude CLI on PATH
+  - Working tree clean (use --discard-partial if dirty from a previous interrupt)
+  - docs/features/<feature>/{why,flow,spec,prd.json,prd-review}.md exists
+
+STOP CONDITIONS
+  - All tasks passes:true              -> exit 0 (success)
+  - Max iterations reached             -> exit 3 (some tasks pending)
+  - Agent reports STUCK                -> exit 2 (manual triage needed)
+  - Dependency cycle / unmet deps      -> exit 4 (inspect prd.json)
+
+MODEL
+  Uses the claude CLI default model. Pin via ANTHROPIC_MODEL env var if needed.
+
+ARTIFACTS PER UI TASK
+  screenshots/<task-id>/<viewport>.png -- required, agent must Read before passes:true.
+HELP
+  exit 0
+fi
+
 if [[ $# -lt 1 ]]; then
   echo "Usage: $0 [--discard-partial] <feature-slug> [max-iterations]" >&2
   echo "  --discard-partial: discard any uncommitted/untracked work before starting (recovery from interrupted runs)" >&2
+  echo "  --help, -h: show detailed help" >&2
   exit 64
 fi
 
@@ -209,6 +256,8 @@ STRICT RULES:
 - It is UNACCEPTABLE to question the priority order. The shell decided. You execute.
 - It is UNACCEPTABLE to re-read the full feature corpus (why.md, spec.md, flow.md, prd-review.md, decisions.md, full prd.json) when the bundle is present. The bundle is the source of truth for context.
 - If you genuinely cannot finish in this invocation (>5 internal retries on the same verification step): print on stderr "STUCK: ${NEXT_ID} — <one-line reason>" and exit 1.
+- After a fix+push, VERIFY IN PRODUCTION -- not just locally. Local pass does not mean production works. After the deploy completes, curl or Playwright the deployed URL and confirm the fix renders correctly (not just HTTP 200 on an SPA shell). If it does not pass production verification, you are not done.
+- Public-facing Edge Functions (any function that receives unauthenticated requests, e.g., webhooks, vendor-response endpoints, publicly-linked quote URLs) MUST be deployed with the --no-verify-jwt flag: `supabase functions deploy <name> --no-verify-jwt`. The config.toml `verify_jwt = false` setting alone is not always honored on redeploy -- pass the flag explicitly every time. Authenticated functions keep the default.
 
 Report at the end (1-3 lines): what you did, what you verified, status. If the bundle was incomplete in any way (forced you to fall back to upstream docs), note exactly what was missing.
 EOF
@@ -275,6 +324,8 @@ STRICT RULES:
 - It is UNACCEPTABLE to ship code with TODO/temporary/hardcoded "for now" comments.
 - It is UNACCEPTABLE to question the priority order. The shell decided. You execute.
 - If you genuinely cannot finish in this invocation (>5 internal retries on the same verification step): print on stderr "STUCK: ${NEXT_ID} — <one-line reason>" and exit 1.
+- After a fix+push, VERIFY IN PRODUCTION -- not just locally. Local pass does not mean production works. After the deploy completes, curl or Playwright the deployed URL and confirm the fix renders correctly (not just HTTP 200 on an SPA shell). If it does not pass production verification, you are not done.
+- Public-facing Edge Functions (any function that receives unauthenticated requests, e.g., webhooks, vendor-response endpoints, publicly-linked quote URLs) MUST be deployed with the --no-verify-jwt flag: `supabase functions deploy <name> --no-verify-jwt`. The config.toml `verify_jwt = false` setting alone is not always honored on redeploy -- pass the flag explicitly every time. Authenticated functions keep the default.
 
 Report at the end (1-3 lines): what you did, what you verified, status.
 EOF
