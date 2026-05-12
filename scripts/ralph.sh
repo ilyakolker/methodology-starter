@@ -119,20 +119,117 @@ for ((ITER=1; ITER<=MAX_ITER; ITER++)); do
 
   log "Iteration ${ITER}/${MAX_ITER} — pending=${PENDING} — picked task: ${NEXT_ID}"
 
-  PROMPT=$(cat <<EOF
+  # Extract context_path for this task (empty string if not present -> legacy fallback)
+  CONTEXT_PATH=$(node -e '
+    const tasks = JSON.parse(require("fs").readFileSync(process.argv[1], "utf-8"));
+    const t = tasks.find(t => t.id === process.argv[2]);
+    console.log((t && t.context_path) ? t.context_path : "");
+  ' "$PRD" "$NEXT_ID")
+
+  if [[ -n "$CONTEXT_PATH" && -f "$CONTEXT_PATH" ]]; then
+    log "Bundle found: ${CONTEXT_PATH} — using cheap-context prompt."
+    BUNDLE_MODE=true
+  else
+    if [[ -n "$CONTEXT_PATH" ]]; then
+      warn "context_path set (${CONTEXT_PATH}) but file missing — falling back to legacy mandatory-reading prompt."
+    else
+      log "No context_path on task — falling back to legacy mandatory-reading prompt."
+    fi
+    BUNDLE_MODE=false
+  fi
+
+  if [[ "$BUNDLE_MODE" == "true" ]]; then
+    PROMPT=$(cat <<EOF
 You are a build agent in a Ralph Wiggum loop. ONE task per invocation. Strict rules below.
 
 Feature: ${FEATURE}
 Task assigned to you (priority-picked by the shell): ${NEXT_ID}
 
-You did NOT pick this task — the loop driver picked it for you because it's the highest-priority passes:false task whose depends_on are all satisfied. Your job is to do this task, NOT to question the priority order.
+You did NOT pick this task — the loop driver picked it for you because it is the highest-priority passes:false task whose depends_on are all satisfied. Your job is to do this task, NOT to question the priority order.
+
+CONTEXT BUNDLE (READ THIS FIRST AND ONLY):
+${CONTEXT_PATH}
+
+This bundle is your complete context for this task. Tech Lead pre-baked it from why.md + spec.md + flow.md + prd-review.md + decisions.md + CLAUDE.md so you do not have to re-read those files every iteration. It contains:
+- Your task's verbatim entry from prd.json (id, category, depends_on, steps, files_touched, spec_ref).
+- The relevant spec.md excerpts.
+- The relevant flow.md excerpts.
+- Tech Lead's per-task review notes.
+- Cross-cutting decisions that apply.
+- The 3-8 CLAUDE.md rules that apply to this task's category.
+- The list of codebase files to touch.
+
+READING DISCIPLINE:
+1. Read the bundle at ${CONTEXT_PATH} once.
+2. Read the codebase files listed in the bundle's "Files the agent will touch" section.
+3. DO NOT re-read docs/features/${FEATURE}/why.md, spec.md, flow.md, flow.png, prd-review.md, decisions.md, or the full prd.json. The bundle already has what you need.
+4. Only fall back to those files if the bundle is explicitly incomplete or self-contradictory. If you have to do this, the bundle has a bug — note it in your final report so Tech Lead can fix the slicing rule.
+5. CLAUDE.md is similarly digested into the bundle. Do not re-read it unless the bundle directs you to.
+
+DELEGATION (use the right specialist for the task):
+The bundle declares this task's category. Spawn accordingly:
+
+- category:functional + schema/RLS/migration work:
+  -> spawn be-engineer. Brief: read the bundle + this task's files_touched; do migration + RLS work; verify via DB queries; flip passes:true; commit.
+- category:functional + Edge Function:
+  -> spawn be-engineer. Brief: write supabase/functions/<name>/index.ts; deploy locally; verify via curl + DB queries.
+- category:functional + shared util:
+  -> spawn fe-engineer. Brief: write util in src/utils/; verify with assertions; flip passes:true.
+- category:functional + FE end-to-end (form, mutation hook, route):
+  -> spawn fe-engineer. Brief: implement against bundle's spec excerpts; verify via Playwright + DB queries.
+- category:ui:
+  -> spawn fe-engineer. Brief: implement JSX + CSS per bundle's spec excerpts; run Playwright at specified viewport; take screenshots; verify visual assertions + NEGATIVE checks; flip passes:true.
+- category:doc-only:
+  -> no subagent. Verify manually by reading the file. Flip passes:true.
+
+When briefing the subagent, point them at the bundle path — do not re-paste the bundle content into the brief.
+
+YOUR JOB:
+1. Read ${CONTEXT_PATH}. Locate this task's steps array — these are what you must verify.
+2. Implement the work using the bundle's files_touched as authoritative. Existing files = edit. NEW: prefixed files = create.
+3. Verify EVERY step in the steps array:
+   - category:functional — DB / API / Edge Function / integration assertions. Run via Supabase CLI, curl, or test scripts.
+   - category:ui — Playwright at the specified viewport. Take screenshots, READ them with the Read tool, verify visual assertions. NEGATIVE checks ("verify X is ABSENT") are first-class — do not skip.
+4. AFTER every step passes: edit prd.json to set passes:true on YOUR task ONLY.
+5. git add the changed code/migration files (NOT just prd.json — the actual implementation must be staged too).
+6. git commit with message: "feat(${FEATURE}/${NEXT_ID}): <one-line description from task>"
+7. Exit cleanly.
+
+LOCAL-AUTONOMOUS RULES:
+- LOCAL migration apply is YOURS to do. Run supabase migration up or supabase db reset as needed. Local DB is reversible.
+- LOCAL Edge Function serve is already running via init.sh. If you write a new function, the serving picks it up automatically.
+- LOCAL types regeneration: if your task touches schema, regenerate types and commit.
+- DO NOT push to remote Supabase. DO NOT deploy Edge Functions to remote. DO NOT git push.
+
+STRICT RULES:
+- It is UNACCEPTABLE to skip a verification step. If a step fails, debug the code, fix it, retry.
+- It is UNACCEPTABLE to flip passes:true without genuine end-to-end verification.
+- It is UNACCEPTABLE to remove, edit, or reorder OTHER tasks' entries in prd.json. Edit ONLY your task's passes field.
+- It is UNACCEPTABLE to ship code with TODO/temporary/hardcoded "for now" comments.
+- It is UNACCEPTABLE to question the priority order. The shell decided. You execute.
+- It is UNACCEPTABLE to re-read the full feature corpus (why.md, spec.md, flow.md, prd-review.md, decisions.md, full prd.json) when the bundle is present. The bundle is the source of truth for context.
+- If you genuinely cannot finish in this invocation (>5 internal retries on the same verification step): print on stderr "STUCK: ${NEXT_ID} — <one-line reason>" and exit 1.
+
+Report at the end (1-3 lines): what you did, what you verified, status. If the bundle was incomplete in any way (forced you to fall back to upstream docs), note exactly what was missing.
+EOF
+)
+  else
+    PROMPT=$(cat <<EOF
+You are a build agent in a Ralph Wiggum loop. ONE task per invocation. Strict rules below.
+
+Feature: ${FEATURE}
+Task assigned to you (priority-picked by the shell): ${NEXT_ID}
+
+You did NOT pick this task — the loop driver picked it for you because it is the highest-priority passes:false task whose depends_on are all satisfied. Your job is to do this task, NOT to question the priority order.
+
+LEGACY MODE — no per-task context bundle is present for this feature. Read the full upstream corpus.
 
 MANDATORY READING (every invocation, every time):
 1. docs/features/${FEATURE}/why.md
 2. docs/features/${FEATURE}/spec.md
 3. docs/features/${FEATURE}/flow.md (and flow.png if relevant)
 4. docs/features/${FEATURE}/prd-review.md — find your task's section. Tech Lead populated files_touched (existing + NEW:) and noted any build-time clarifications. These are AUTHORITATIVE — use them.
-5. docs/features/${FEATURE}/decisions.md — cross-cutting decisions (D1-D5 etc.). Honor them.
+5. docs/features/${FEATURE}/decisions.md — cross-cutting decisions (D1-D5 etc.). Honor them. (Skip if file does not exist.)
 6. docs/features/${FEATURE}/prd.json — find your task by id="${NEXT_ID}".
 7. CLAUDE.md — project rules.
 
@@ -140,22 +237,17 @@ DELEGATION (use the right specialist for the task):
 This task's category and nature determine which subagent to spawn. Read the task in prd.json, then:
 
 - category:functional + schema/RLS/migration work:
-  → spawn \`be-engineer\`. Brief: read why.md + spec.md + prd-review.md + this task's entry; do migration + RLS work; verify via DB queries; flip passes:true; commit.
-
+  -> spawn be-engineer. Brief: read why.md + spec.md + prd-review.md + this task's entry; do migration + RLS work; verify via DB queries; flip passes:true; commit.
 - category:functional + Edge Function:
-  → spawn \`be-engineer\`. Brief: write supabase/functions/<name>/index.ts; deploy locally (init.sh has it serving); verify via curl + DB queries.
-
+  -> spawn be-engineer. Brief: write supabase/functions/<name>/index.ts; deploy locally; verify via curl + DB queries.
 - category:functional + shared util (e.g. phone-normalization-util):
-  → spawn \`fe-engineer\`. Brief: write util in src/utils/; verify with assertions; flip passes:true.
-
+  -> spawn fe-engineer. Brief: write util in src/utils/; verify with assertions; flip passes:true.
 - category:functional + FE end-to-end (form, mutation hook, route):
-  → spawn \`fe-engineer\`. Brief: implement against spec; verify via Playwright + DB queries.
-
+  -> spawn fe-engineer. Brief: implement against spec; verify via Playwright + DB queries.
 - category:ui:
-  → spawn \`fe-engineer\`. Brief: implement JSX + CSS per spec; run Playwright at specified viewport; take screenshots; verify visual assertions + NEGATIVE checks; flip passes:true.
-
+  -> spawn fe-engineer. Brief: implement JSX + CSS per spec; run Playwright at specified viewport; take screenshots; verify visual assertions + NEGATIVE checks; flip passes:true.
 - category:doc-only:
-  → no subagent. Verify manually by reading the file. Flip passes:true.
+  -> no subagent. Verify manually by reading the file. Flip passes:true.
 
 You (parent claude) orchestrate. Subagent does domain work. After subagent returns, verify the commit was made, then exit cleanly. If subagent reports STUCK, propagate the signal.
 
@@ -171,7 +263,7 @@ YOUR JOB:
 7. Exit cleanly.
 
 LOCAL-AUTONOMOUS RULES:
-- LOCAL migration apply is YOURS to do. Run \`supabase migration up\` or \`supabase db reset\` as needed. Local DB is reversible.
+- LOCAL migration apply is YOURS to do. Run supabase migration up or supabase db reset as needed. Local DB is reversible.
 - LOCAL Edge Function serve is already running via init.sh. If you write a new function, the serving picks it up automatically.
 - LOCAL types regeneration: if your task touches schema, regenerate types and commit.
 - DO NOT push to remote Supabase. DO NOT deploy Edge Functions to remote. DO NOT git push. The loop runs entirely against the local stack — remote concerns are for a separate workflow after the loop ships.
@@ -187,6 +279,7 @@ STRICT RULES:
 Report at the end (1-3 lines): what you did, what you verified, status.
 EOF
 )
+  fi
 
   log "Invoking claude (acceptEdits, print mode) for ${NEXT_ID}..."
   set +e
