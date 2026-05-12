@@ -2,6 +2,35 @@
 
 You are being asked to bootstrap a new project with this methodology. Follow this protocol exactly.
 
+## The fast path — `bootstrap.sh` (recommended)
+
+If you have the starter cloned locally, the entire 7-step protocol below is automated by a single script:
+
+```bash
+bash <starter-path>/bootstrap.sh <new-project-folder>
+```
+
+The script:
+- Installs global agents to `~/.claude/agents/` (skips any already present)
+- Creates the new project folder + `git init`
+- Copies methodology, skills, scripts, templates, and `init.sh`
+- Sets up git hooks (`core.hooksPath`)
+- Initializes `.gitignore`
+- Seeds `~/.claude/projects/<slug>/memory/` with portable lessons
+- Writes a `CLAUDE.md` with `<PROJECT_NAME>` placeholder substituted
+
+When the script finishes, open Claude Code in the new project folder and say:
+
+> Read `CLAUDE.md` and fill in the remaining placeholders by asking me the intake questions.
+
+The orchestrator finishes the intake interactively (Step 1 below). Then `feature-plan: <name>` to start the first feature.
+
+---
+
+## The manual path (if you can't run bootstrap.sh)
+
+Follow the protocol below step by step. Use it as a checklist if something in the script needs to be re-done by hand.
+
 ## Step 0 — Ensure global agents are installed (one-time per machine)
 
 Check if `~/.claude/agents/` exists and contains the 7 role files (pm.md, designer.md, fe-engineer.md, be-engineer.md, copywriter.md, tech-lead.md, qa-engineer.md).
@@ -96,7 +125,7 @@ git config core.hooksPath scripts/git-hooks
 Add to `<new-project>/.gitignore`:
 ```
 e2e/.auth/
-e2e/.test-couple.env
+e2e/.test-user.env
 .env.local.secrets
 ```
 
