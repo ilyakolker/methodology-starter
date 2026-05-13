@@ -28,6 +28,10 @@ Owner reads the designed flow and reacts: "approve" or "change X to Y." Owner ne
 
 If Designer is genuinely stuck on a decision that needs owner taste/strategic input (e.g., "do we want the brand to feel A or B?"), Designer surfaces that as ONE focused question — not a checklist of 7 design choices punted upstream.
 
+**The "ONE focused question" exception is narrow.** It's for emotional / brand / strategic taste — NOT for UX-engineering choices Designer can solve themselves. UX-engineering = tabs vs scroll, modal vs full page, banner vs silent restore, inline error vs toast, sidebar vs bottom-tab. Those are Designer's job. If Designer frames a UX-engineering choice as a "genuine open issue for owner," they're punting. Owner has called this out (verbatim): "but why I'm deciding? how was that flipped on me?"
+
+**Orchestrator catches the punt too.** When Designer's output contains "ONE genuine open issue for owner" or equivalent framing, orchestrator must inspect whether the issue is genuinely taste/strategic. If it's UX-engineering, send it back to Designer with "make the call, don't punt." Do NOT pass it through to owner verbatim. Both Designer's punt AND orchestrator's pass-through are failures of the same rule.
+
 **How to apply:**
 - Designer's first round-trip output = the flow.md draft (or a tight summary thereof). Not a Q&A.
 - Owner reacts to specific design choices ("change Q5 to my-vendors view in nav").
