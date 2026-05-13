@@ -150,6 +150,8 @@ After Tech Lead approves `prd.json`, the build is run by `scripts/ralph.sh` — 
 
 Each Ralph iteration consumes the task's pre-baked context bundle (see `methodology/per-task-context-bundles.md`) instead of re-reading the full feature corpus. Tech Lead generates the bundles as Step 7 of the PRD review, so by the time Ralph runs, each task has its own self-sufficient context file referenced via `context_path` in `prd.json`. Features authored before the bundle protocol existed fall back automatically to the legacy mandatory-reading list — no flag day.
 
+UI tasks additionally carry a `verification_mode` field (`dom-only` default, `visual-review` opt-in). Tech Lead sets it in Step 7.5. With `dom-only`, the .mjs DOM assertions are the verification gate and the agent does NOT Read screenshots back — vision tokens are saved on tasks where every acceptance criterion is DOM-assertable. With `visual-review`, the agent Reads every screenshot and quotes a specific visual property per screenshot, reserved for criteria that genuinely require visual judgment (composition, design-spec match, optical alignment). Missing field defaults to `dom-only`; opting into visual review is explicit.
+
 ---
 
 ## Linked protocol files

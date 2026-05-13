@@ -136,6 +136,99 @@ There is no flag day. Bundles roll out per feature, opt-in.
 
 ---
 
+## Verification mode (UI tasks only)
+
+UI tasks come in two flavors. Tech Lead picks one per task during bundle generation.
+
+Both flavors run the same Playwright .mjs script. The .mjs always captures screenshots to `screenshots/<task-id>/<viewport>.png` for on-disk human review. **The difference is whether the AGENT reads those screenshots back via the Read tool during the Ralph iteration.** Vision tokens on a single 375x812 screenshot Read cost roughly 1500-3000 tokens. Multiplied across every UI task in a feature, this dominates the per-iteration cost — and most of it is wasted when every acceptance criterion is already covered by DOM assertions in the .mjs.
+
+### The two values
+
+- **`dom-only`** (default) — The .mjs script runs all DOM assertions (text content, attributes, computed styles, element counts, focus state, navigation, ARIA roles, getBoundingClientRect dimensions). The .mjs takes screenshots and writes them to disk for human review. **The agent does NOT Read the screenshots back.** If .mjs exits 0 and the screenshot files exist on disk, the task passes. The screenshots are there for the owner to eyeball post-hoc if they choose, not for the agent to interpret.
+
+- **`visual-review`** — Everything `dom-only` does, plus the agent MUST Read every screenshot back via the Read tool and quote one specific visual property per screenshot (e.g., "the success card occupies roughly the upper third of the viewport with the CTA flush to the right edge"). Reserved for tasks whose acceptance criteria genuinely require visual quality judgment that DOM assertions cannot express.
+
+### Decision rule
+
+Pick `dom-only` when every acceptance criterion is expressible as a DOM assertion:
+
+- Text content (`textContent`, `innerText`)
+- Attributes (`href`, `src`, `aria-*`, `data-*`, `disabled`, `type`)
+- Computed styles via `getComputedStyle` (color, background, font-size, font-weight, display, visibility)
+- Element counts (`querySelectorAll('button').length === 1`)
+- Focus state (`document.activeElement`)
+- Click navigation (URL changes, route landed)
+- ARIA role / accessibility tree
+- Tab order (focus traversal)
+- Layout dimensions via `getBoundingClientRect` (width, height, top, left, overlap checks)
+- Element presence / absence (negative checks: "verify Y is ABSENT at this viewport")
+
+Pick `visual-review` only when a criterion genuinely requires visual judgment:
+
+- Composition / layout balance ("the three feature cards form a balanced triptych")
+- Design-spec aesthetic match ("matches the warm-Mediterranean direction-B mood")
+- Multi-element spacing balance that no single getBoundingClientRect captures
+- Pixel rendering quality (anti-aliasing on a custom-rendered chart, RTL number rendering edge case)
+- Image quality / cropping (vendor logo respects safe-area, no distortion)
+- Font rendering (Hebrew kerning, mixed-script line layout)
+
+### Mixed criteria
+
+If a task has both DOM-checkable and visual criteria, **mark `visual-review`**. The visual-review mode is a strict superset of dom-only — it does both. Splitting one UI task into "the dom-only half" and "the visual half" produces two tasks that ship together; that's noise, not separation.
+
+### Default lean
+
+When in doubt, pick `dom-only`. Visual-review is the opt-in. The acceptance criterion must explicitly reference visual quality (using words like "balanced", "composition", "feel", "mood", "rendering", "aesthetic") for visual-review to be justified. "The header looks right" is not a criterion — push back to Designer for a DOM-assertable version.
+
+### Examples
+
+**`dom-only` — vendor login phone screen at 375px**
+- One H1 visible with text "התחברות"
+- One phone input with `type="tel"` and `dir="ltr"`
+- One submit button labeled "המשך" with the primary variant class
+- No back button visible (verify ABSENT)
+- Submit disabled while input is empty (`disabled` attribute), enabled after 10 valid digits
+
+Every assertion is DOM. Screenshots go to disk for the owner to scan post-merge if curious. `dom-only`.
+
+**`dom-only` — error toast on network failure**
+- Toast container visible with the `destructive` variant class
+- Toast text contains "אירעה שגיאה" or the localised network-failure string
+- Toast auto-dismisses after the configured ms (timeline assertion)
+- Submit CTA remains enabled after toast appears
+
+DOM-only — the toast's visual styling is governed by the variant class, which IS the DOM assertion.
+
+**`visual-review` — landing-page hero at 1280px (Direction B redesign)**
+- The three feature cards form a balanced triptych with consistent inter-card spacing AND each card's image-to-text ratio matches the design spec's warm-Mediterranean feel
+- Hebrew headline kerns correctly with the latin-mixed sub-headline (no visible tracking artifacts)
+- Hero image crops the bride-and-groom safe-area correctly across breakpoints
+
+These criteria require seeing the pixels. Visual-review.
+
+**`visual-review` — onboarding success illustration**
+- The illustration's color palette matches the design tokens within JND
+- The illustration aligns optically (not just geometrically) with the headline beneath it
+
+Optical alignment is a visual judgment — geometric `getBoundingClientRect` does not capture it. Visual-review.
+
+### Backward compatibility
+
+Tasks written before this protocol existed have no `verification_mode` field. Ralph defaults to `dom-only` when the field is missing — i.e., the cheap path. The previous mandatory-Read-every-screenshot behavior is gone unless a task explicitly sets `verification_mode: "visual-review"`. Existing approved bundles continue to build; tasks that genuinely needed visual review must have their entries updated to opt in.
+
+### What the .mjs does (unchanged)
+
+Regardless of mode, the .mjs:
+- Runs at the explicit viewport (e.g., 375px, 1280px) — never "mobile" as a vague label
+- Captures screenshots to `screenshots/<task-id>/<viewport>.png`
+- Asserts negative checks first-class ("verify ONE submit button — no duplicate")
+- Exits 0 on pass, non-zero on fail
+
+The only thing the mode changes is whether the agent calls Read on the screenshot files after the .mjs exits.
+
+
+---
+
 ## File locations (Tech Lead writes these)
 
 | File | When |

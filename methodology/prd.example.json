@@ -20,7 +20,9 @@
     "id": "vendor-form-submission-functional",
     "category": "functional",
     "description": "POST /vendors creates vendor row and triggers WhatsApp send.",
-    "depends_on": ["vendor-table-migration"],
+    "depends_on": [
+      "vendor-table-migration"
+    ],
     "files_touched": [
       "NEW: supabase/functions/submit-vendor/index.ts",
       "src/integrations/supabase/types.ts"
@@ -38,7 +40,9 @@
     "id": "vendor-form-ui-mobile",
     "category": "ui",
     "description": "Vendor add form at 375px — name, phone, category fields visible, ONE submit CTA.",
-    "depends_on": ["vendor-form-submission-functional"],
+    "depends_on": [
+      "vendor-form-submission-functional"
+    ],
     "files_touched": [
       "src/features/vendors/AddVendorForm.tsx",
       "src/pages/AddVendor.tsx"
@@ -52,6 +56,33 @@
     ],
     "spec_ref": "docs/features/couple-add-vendor/spec.md#add-vendor-mobile",
     "context_path": "docs/features/couple-add-vendor/tasks/vendor-form-ui-mobile.context.md",
+    "passes": false,
+    "verification_mode": "dom-only",
+    "verification_mode_rationale": "Every acceptance criterion (single CTA, vertical stack of fields, success copy match) is expressible via querySelectorAll counts, getComputedStyle, and textContent. No visual quality judgment needed — screenshots go to disk for owner review only."
+  },
+  {
+    "id": "vendor-form-success-card-ui-mobile",
+    "category": "ui",
+    "description": "Vendor add success card at 375px — composition matches direction-B warm mood, illustration optically aligns with confirmation copy.",
+    "depends_on": [
+      "vendor-form-submission-functional",
+      "vendor-form-ui-mobile"
+    ],
+    "files_touched": [
+      "src/features/vendors/AddVendorSuccessCard.tsx"
+    ],
+    "steps": [
+      "Playwright navigate to /add-vendor at 375px and submit a valid payload.",
+      "Wait for success state; screenshot full viewport.",
+      "Agent Reads the screenshot and confirms: success-card illustration optically centers above the confirmation copy (not just geometrically — visual judgment).",
+      "Agent Reads the screenshot and confirms: warm-Mediterranean palette is in evidence (no out-of-token color leaks).",
+      "DOM assert: ONE success heading visible (no duplicate header).",
+      "DOM assert: confirmation textContent matches spec copy verbatim."
+    ],
+    "spec_ref": "docs/features/couple-add-vendor/spec.md#success-card-mobile",
+    "context_path": "docs/features/couple-add-vendor/tasks/vendor-form-success-card-ui-mobile.context.md",
+    "verification_mode": "visual-review",
+    "verification_mode_rationale": "Two criteria require visual judgment: (1) optical (not geometric) alignment of illustration over copy, (2) palette feel matching direction-B mood. Neither is fully captured by getComputedStyle or getBoundingClientRect. The other criteria stay DOM-asserted, but the presence of even one genuinely-visual criterion makes the whole task visual-review.",
     "passes": false
   }
 ]

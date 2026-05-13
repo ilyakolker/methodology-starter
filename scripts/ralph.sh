@@ -75,7 +75,11 @@ MODEL
   Uses the claude CLI default model. Pin via ANTHROPIC_MODEL env var if needed.
 
 ARTIFACTS PER UI TASK
-  screenshots/<task-id>/<viewport>.png -- required, agent must Read before passes:true.
+  screenshots/<task-id>/<viewport>.png -- always captured to disk for human review.
+  verification_mode on the task (UI tasks only):
+    dom-only      (default) .mjs DOM assertions are the gate. Agent does NOT Read the screenshots back. Cheap.
+    visual-review              .mjs runs + agent Reads each screenshot and quotes one specific visual property. Opt-in, vision-token cost.
+  Missing field on a task -> defaults to dom-only (backward-compatible).
 HELP
   exit 0
 fi
@@ -185,6 +189,40 @@ for ((ITER=1; ITER<=MAX_ITER; ITER++)); do
     BUNDLE_MODE=false
   fi
 
+  # Extract category + verification_mode (UI-only). Default verification_mode -> dom-only when missing.
+  TASK_CATEGORY=$(node -e '
+    const tasks = JSON.parse(require("fs").readFileSync(process.argv[1], "utf-8"));
+    const t = tasks.find(t => t.id === process.argv[2]);
+    console.log((t && t.category) ? t.category : "");
+  ' "$PRD" "$NEXT_ID")
+
+  VERIFICATION_MODE=$(node -e '
+    const tasks = JSON.parse(require("fs").readFileSync(process.argv[1], "utf-8"));
+    const t = tasks.find(t => t.id === process.argv[2]);
+    if (!t) { console.log(""); process.exit(0); }
+    if ((t.category || "") !== "ui") { console.log("n/a"); process.exit(0); }
+    const mode = t.verification_mode;
+    if (mode === "visual-review") { console.log("visual-review"); }
+    else if (mode === "dom-only" || !mode) { console.log("dom-only"); }
+    else { console.error("WARN: unknown verification_mode=" + mode + " on task " + t.id + " — defaulting to dom-only"); console.log("dom-only"); }
+  ' "$PRD" "$NEXT_ID")
+
+  if [[ "$TASK_CATEGORY" == "ui" ]]; then
+    log "Task category=ui  verification_mode=${VERIFICATION_MODE}"
+  fi
+
+  # Build the UI-verification instructions block (only injected into bundle-mode prompt).
+  # Legacy mode keeps its existing behavior unchanged.
+  # For non-UI tasks (functional, doc-only), the block is a no-op blank line.
+  if [[ "$TASK_CATEGORY" != "ui" ]]; then
+    UI_VERIFY_BLOCK=''
+  elif [[ "$VERIFICATION_MODE" == "visual-review" ]]; then
+    UI_VERIFY_BLOCK='   - category:ui (verification_mode=visual-review) — Playwright at the specified viewport via the .mjs script. The .mjs MUST capture screenshots to screenshots/<task-id>/<viewport>.png AND run DOM assertions. After .mjs exits 0, you MUST Read every screenshot file via the Read tool and quote ONE specific visual property per screenshot in your report (e.g., "the success card occupies the upper third of the viewport with the CTA flush to the right edge"). NEGATIVE checks ("verify X is ABSENT at this viewport") are first-class — do not skip.'
+  else
+    # dom-only is the default for UI tasks when verification_mode is missing or set to "dom-only".
+    UI_VERIFY_BLOCK='   - category:ui (verification_mode=dom-only) — Playwright at the specified viewport via the .mjs script. The .mjs MUST run DOM assertions (text content, attributes, computed styles, element counts, focus state, navigation, getBoundingClientRect, ARIA roles, presence/absence). The .mjs captures screenshots to screenshots/<task-id>/<viewport>.png for on-disk human review. You DO NOT Read the screenshots back via the Read tool — that step is intentionally skipped to save vision tokens. The gate is: .mjs exits 0 AND every screenshot file exists on disk AND every DOM assertion in the steps array fires. NEGATIVE checks ("verify X is ABSENT at this viewport") are first-class — encode them as DOM assertions in the .mjs.'
+  fi
+
   if [[ "$BUNDLE_MODE" == "true" ]]; then
     PROMPT=$(cat <<EOF
 You are a build agent in a Ralph Wiggum loop. ONE task per invocation. Strict rules below.
@@ -236,7 +274,7 @@ YOUR JOB:
 2. Implement the work using the bundle's files_touched as authoritative. Existing files = edit. NEW: prefixed files = create.
 3. Verify EVERY step in the steps array:
    - category:functional — DB / API / Edge Function / integration assertions. Run via Supabase CLI, curl, or test scripts.
-   - category:ui — Playwright at the specified viewport. Take screenshots, READ them with the Read tool, verify visual assertions. NEGATIVE checks ("verify X is ABSENT") are first-class — do not skip.
+${UI_VERIFY_BLOCK}
 4. AFTER every step passes: edit prd.json to set passes:true on YOUR task ONLY.
 5. git add the changed code/migration files (NOT just prd.json — the actual implementation must be staged too).
 6. git commit with message: "feat(${FEATURE}/${NEXT_ID}): <one-line description from task>"

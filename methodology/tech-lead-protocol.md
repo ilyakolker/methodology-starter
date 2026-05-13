@@ -8,6 +8,7 @@
 - Plain-English intros added to every check. The bullets stayed; the wall-of-bullets feel did not.
 - Check 8 sharpened — strict UI/functional category separation. UI tasks must include negative checks. Mixed tasks are split.
 - **NEW Step 7 (BUNDLE)** — after every entry is APPROVE, Tech Lead pre-bakes a per-task context bundle so Ralph reads ~5 KB per iteration instead of the full feature corpus. See `methodology/per-task-context-bundles.md` for the bundle spec.
+- **NEW Step 7.5 (VERIFICATION MODE)** — for each UI task, Tech Lead sets `verification_mode` to `dom-only` (default, cheap) or `visual-review` (opt-in, screenshot Read). Saves vision tokens on tasks where every acceptance criterion is DOM-assertable. See `methodology/per-task-context-bundles.md#verification-mode-ui-tasks-only`.
 
 ---
 
@@ -277,6 +278,71 @@ If PM revises a task after this step (or owner asks for changes during a later r
 
 ---
 
+## Step 7.5 — VERIFICATION MODE (per UI task)
+
+*Why this matters:* Every UI task captures screenshots, but most acceptance criteria are DOM-assertable (text, attributes, computed styles, element counts, focus, navigation, dimensions). When the .mjs already proves the page rendered correctly via DOM assertions, having the agent Read each screenshot back costs vision tokens for no signal gain. The `verification_mode` field on each UI task tells Ralph whether to skip or perform the screenshot Read step. Tech Lead picks per task.
+
+Run this step alongside Step 7 — same final pass through `prd.json`. For each task in `prd.json` with `category: "ui"`, add a `verification_mode` field set to one of:
+
+- **`dom-only`** (default) — .mjs runs DOM assertions and captures screenshots to disk; the agent does NOT Read the screenshots during the Ralph iteration. Saves vision tokens.
+- **`visual-review`** — .mjs does everything dom-only does AND the agent Reads every screenshot back, quoting one specific visual property per screenshot. Reserved for tasks whose acceptance criteria genuinely require visual quality judgment.
+
+Functional and doc-only tasks omit the field — it's UI-only.
+
+### Decision rule
+
+Pick **`dom-only`** when every acceptance criterion is expressible as a DOM assertion:
+
+- Text content (`textContent` / `innerText`)
+- Attributes (`href`, `src`, `aria-*`, `data-*`, `disabled`, `type`, `dir`)
+- Computed styles via `getComputedStyle` (color, background, font-size, font-weight, display, visibility)
+- Element counts (`querySelectorAll(...).length === N`)
+- Focus state (`document.activeElement`)
+- Click navigation (URL change, route landed)
+- ARIA role / accessibility tree
+- Tab order / focus traversal
+- Layout dimensions via `getBoundingClientRect` (width, height, top, left, overlap checks)
+- Element presence / absence (negative checks: "verify Y is ABSENT")
+
+Pick **`visual-review`** only when a criterion genuinely requires visual judgment:
+
+- Composition / layout balance ("balanced triptych", "feels warm-Mediterranean")
+- Design-spec aesthetic match ("matches direction-B mood")
+- Multi-element spacing balance that no single getBoundingClientRect captures
+- Pixel rendering quality (anti-aliasing, custom chart rendering, RTL number rendering)
+- Image quality / cropping (safe-area respected, no distortion)
+- Font rendering (Hebrew kerning, mixed-script line layout, optical alignment)
+
+If a task has both DOM-checkable AND visual criteria, mark **`visual-review`** (the visual-review mode does both — splitting one UI task into two for the modes is noise).
+
+### Default lean
+
+When in doubt, pick `dom-only`. Visual-review is the opt-in. The acceptance criterion must explicitly reference visual quality (words like "balanced", "composition", "feel", "mood", "rendering", "aesthetic") for visual-review to be justified. "The header looks right" is not a criterion — push it back to Designer for a DOM-assertable rewrite.
+
+### Backward compatibility
+
+Tasks without a `verification_mode` field default to `dom-only` in Ralph. The previous mandatory-Read-every-screenshot behavior is gone unless `verification_mode: "visual-review"` is set explicitly. When upgrading an existing feature, walk its UI tasks and opt-in any whose acceptance criteria genuinely require visual review.
+
+### Recording the choice
+
+Add the field directly to the task entry in `prd.json`:
+
+```json
+{
+  "id": "vendor-form-ui-mobile",
+  "category": "ui",
+  "verification_mode": "dom-only",
+  "...": "..."
+}
+```
+
+No separate file. The field travels with the task entry.
+
+See `methodology/per-task-context-bundles.md#verification-mode-ui-tasks-only` for the full spec and worked examples.
+
+
+---
+
 ## Anti-patterns (Tech Lead must not do)
 
 - Redesign the feature. Out of lane — that's PM/Designer.
@@ -297,5 +363,6 @@ If PM revises a task after this step (or owner asks for changes during a later r
 | `docs/features/<feature>/prd-review.md` | End of Step 4, appended in Step 5 |
 | `docs/features/<feature>/tasks/<task-id>.context.md` | Step 7, one per task |
 | `context_path` field in `docs/features/<feature>/prd.json` | Step 7, same commit as bundle creation |
+| `verification_mode` field on each UI task in `docs/features/<feature>/prd.json` | Step 7.5, same commit as bundle creation |
 
 Tech Lead does not write `docs/methodology.md` — that's the converged final doc, after all three protocols align.
