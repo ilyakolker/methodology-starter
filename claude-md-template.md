@@ -8,7 +8,7 @@
 - **Brand voice**: <BRAND_VOICE>
 
 ## Domain Terms
-<DOMAIN_TERMS> — list the key nouns this product uses (e.g. "couples / vendors / categories / quotes" for a wedding app, "users / accounts / transactions" for finance).
+<DOMAIN_TERMS> — list the key nouns this product uses (e.g. "users / orders / products / reviews" for e-commerce, "patients / appointments / providers / notes" for healthcare, "accounts / transactions / invoices / payouts" for fintech).
 
 ## Required Secrets
 <REQUIRED_SECRETS>

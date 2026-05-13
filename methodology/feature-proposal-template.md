@@ -13,7 +13,7 @@
 ## 1. Feature name
 *One line. Verb-first if possible. Not a feature category — a specific thing.*
 
-> Example: "Send quote requests to vendors via WhatsApp" — not "WhatsApp integration".
+> Example: "Send order confirmation emails with tracking link" — not "Email integration".
 
 ## 2. The pain
 *What's broken or missing today, in user terms — not product terms.*
@@ -30,7 +30,7 @@ Answer two things:
 - The single sentence the user could say after using it: "I just ___."
 - What changes for them in their life / workflow?
 
-> Not "they can use the dashboard". Yes "they sent quote requests to 5 vendors in 2 minutes without typing".
+> Not "they can use the dashboard". Yes "they submitted a support ticket in under 60 seconds from the app, without switching to email".
 
 ## 4. Why now
 *Why is this priority over everything else on the list?*
@@ -43,16 +43,16 @@ Pick at least one:
 - Cheap to build, high signal
 
 ## 5. Who it's for
-*Specific persona. Not "users". Not "couples". Not "vendors".*
+*Specific persona. Not "users". Not "customers". Not "admins".*
 
-- Who exactly? (e.g. "couple 6 months out from wedding, hasn't booked photographer, on mobile in Tel Aviv")
+- Who exactly? (e.g. "first-time buyer, hasn't completed checkout, on mobile")
 - Are they already in the product? New? Returning?
 - Roughly what % of total users does this persona represent?
 
 ## 6. What success looks like
 *Measurable signal. Rough is fine. "I'll know it when I see it" is not enough.*
 
-- Primary metric (e.g. "40% of couples who reach screen X click Y")
+- Primary metric (e.g. "40% of users who reach screen X click Y")
 - Time to validate (e.g. "2 weeks of traffic")
 - Kill criterion — at what number do we conclude this didn't work?
 
@@ -63,7 +63,7 @@ Pick at least one:
 - Edge cases being deferred
 - Things that sound related but aren't
 
-> Example: "Vendor side reply parsing — not in scope. Vendors click a link and submit via web form."
+> Example: "Automated refund processing — not in scope. Users click a link and submit a refund request via web form."
 
 ---
 
