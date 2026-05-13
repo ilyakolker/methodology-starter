@@ -142,9 +142,18 @@ For each screen in the flow:
 
 Every `flow.md` must include:
 
-- A **flow diagram** (Mermaid is fine — text in repo, renders in GitHub) or a numbered screen list with arrows.
+- A **rendered `flow.png`** embedded at the TOP of the file as `![flow](flow.png)`. The Mermaid source goes below as the editable representation — raw Mermaid text alone is unreadable for scan-speed review.
 - **Every state explicitly listed** for every screen (empty / loading / error / success / partial / disabled).
 - **Every relevant edge case explicitly answered** for every screen — silence equals a bug at build time.
+
+**HARD RULE — flow.png is mandatory, not optional.**
+
+Render command:
+```bash
+npx @mermaid-js/mermaid-cli -i tmp/<feature>-flow.mmd -o docs/features/<feature>/flow.png --backgroundColor transparent --width 2000
+```
+
+Extract the Mermaid block from flow.md to a `.mmd` file first, then render. If mermaid-cli isn't installed, `npx` installs it on demand — do NOT ask owner which renderer to use. The methodology has one rendering path; pick it silently. Verify the PNG is non-trivial (>10 KB) before declaring flow.md complete.
 
 Note what `flow.md` does NOT include: wireframes, mockups, component sketches. The flow is a textual specification of behavior. Visual decisions happen in Step 4 against the existing design system. Visual verification happens at build time when FE renders the real screen.
 
@@ -289,6 +298,8 @@ Designer does not author `docs/features/<feature>/prd.json` — that's PM. Desig
 Designer's work on a feature is done when ALL of these are true:
 
 - [ ] `flow.md` is owner-approved.
+- [ ] `flow.png` exists on disk at `docs/features/<feature>/flow.png` and is non-trivial (>10 KB).
+- [ ] `flow.md` embeds `flow.png` at the top with `![flow](flow.png)` — Mermaid source is below as the editable representation.
 - [ ] Every screen in `flow.md` has every state listed (empty/loading/error/success/partial/disabled).
 - [ ] Every relevant checklist edge case is explicitly answered (or marked out of scope with justification).
 - [ ] `spec.md` Designer sections are complete, PM-aligned, and Copywriter has filled all visible strings.

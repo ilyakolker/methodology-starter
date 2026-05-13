@@ -286,3 +286,17 @@ Last gut-check before writing flow.md.
 Once all sections are answered (or explicitly marked "N/A — not relevant because X" or "deferred — out of scope, justified"), Designer writes `docs/features/<feature>/flow.md`. Owner reviews; if anything is still ambiguous, return to the relevant section.
 
 > **Reminder:** "I'll figure that out at build time" is not an acceptable answer here. If a question is truly out of scope, mark it explicitly out of scope with a sentence of justification. Silence is not an answer.
+
+### flow.md artifact verification (Designer runs before presenting to owner)
+
+- [ ] `flow.png` exists on disk at `docs/features/<feature>/flow.png`
+- [ ] `flow.md` embeds it at the top with `![flow](flow.png)` — not inside a code fence, as an actual image tag
+- [ ] PNG size sanity check: file is >10 KB (0-byte or trivially small means the render failed silently)
+- [ ] Mermaid source is present BELOW the image in a fenced code block as the editable representation
+
+**Render command (do not ask owner — execute this):**
+```bash
+npx @mermaid-js/mermaid-cli -i tmp/<feature>-flow.mmd -o docs/features/<feature>/flow.png --backgroundColor transparent --width 2000
+```
+
+Extract the Mermaid block to a `.mmd` file first, then render. `npx` installs mermaid-cli on demand if not present. Do not punt the renderer choice to owner.

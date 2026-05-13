@@ -19,7 +19,7 @@ owner brain (chat)
     ↓
 PM: WHY phase  →  why.md
     ↓
-Designer: FLOW phase  →  flow.md
+Designer: FLOW phase  →  flow.md + flow.png
     ↓
 PM + Designer + Copywriter: SPEC phase  →  spec.md  (copy locked here)
     ↓
@@ -68,7 +68,7 @@ Max-iterations is the safety net for runaway loops, not a quality gate. If Ralph
 
 **PM** owns *what* and *why*. Writes `why.md` (persona, pain, outcome, success metric). Co-authors `spec.md`. Authors `prd.json` — the mechanical task list Tech Lead reviews. PM does not design and does not code. PM is the gatekeeper for scope creep.
 
-**Designer** owns *flow* and *visual*. Writes `flow.md` — every screen, every state, every transition, every empty/error/loading edge case. Co-authors `spec.md` for the visual side (layout, components, design tokens). Designer does not write copy and does not write code.
+**Designer** owns *flow* and *visual*. Writes `flow.md` (every screen, every state, every transition, every empty/error/loading edge case) and renders `flow.png` — the PNG must be embedded at the top of `flow.md` before it is presented to the owner. Mermaid source alone is not a deliverable. Co-authors `spec.md` for the visual side (layout, components, design tokens). Designer does not write copy and does not write code.
 
 **Copywriter** owns *every visible string*. Reviews and locks all Hebrew copy in `spec.md`. After SPEC, copy is frozen — engineers paste it as-is. Copywriter does not design and does not author features.
 
@@ -89,7 +89,7 @@ For every feature `<f>` (kebab-case, short), the pipeline produces these files i
 | File | Owner | Purpose |
 |---|---|---|
 | `why.md` | PM | Persona, pain, outcome, success metric. The reason we're building this. |
-| `flow.md` | Designer | Every screen, state, transition, edge case. The full UX map. |
+| `flow.md` + `flow.png` | Designer | Every screen, state, transition, edge case. The full UX map. `flow.png` is a required co-artifact — rendered PNG embedded at the top of `flow.md`. Mermaid source below as editable representation. Mermaid text alone is not a deliverable. |
 | `spec.md` | PM + Designer + Copywriter | Goals + visual + every visible string. Copy locked here. |
 | `prd.json` | PM (Tech Lead reviews) | Mechanical task list, Ralph-readable, machine-executable plan. |
 | `prd-review.md` | Tech Lead | Per-task APPROVE / REVISE / REJECT verdicts plus required changes. |
@@ -116,7 +116,7 @@ Each downstream phase is triggered by the previous role finishing their artifact
 
 These were settled today (2026-05-07) and the protocol files reflect them:
 
-1. **One feature folder, all artifacts inside it.** `docs/features/<f>/why.md`, `flow.md`, `spec.md`, `prd.json`, `prd-review.md` — together, never scattered.
+1. **One feature folder, all artifacts inside it.** `docs/features/<f>/why.md`, `flow.md`, `flow.png`, `spec.md`, `prd.json`, `prd-review.md` — together, never scattered. `flow.png` is a required artifact alongside `flow.md`; the rendered PNG must be committed with the flow document.
 2. **Copy is locked in SPEC.** After spec.md is signed, no role rewrites Hebrew strings during build. Copy bugs go through Copywriter, not engineers.
 3. **Tech Lead is read-only.** No code, no patches, no edits outside `prd-review.md`. Notes only.
 4. **Tech Lead decides architectural patterns.** Owner is not pulled in per pattern. Tech Lead writes a 2-3 line rationale; owner only weighs in if Tech Lead asks.
