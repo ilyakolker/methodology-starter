@@ -9,6 +9,7 @@
 - Check 8 sharpened — strict UI/functional category separation. UI tasks must include negative checks. Mixed tasks are split.
 - **NEW Step 7 (BUNDLE)** — after every entry is APPROVE, Tech Lead pre-bakes a per-task context bundle so Ralph reads ~5 KB per iteration instead of the full feature corpus. See `methodology/per-task-context-bundles.md` for the bundle spec.
 - **NEW Step 7.5 (VERIFICATION MODE)** — for each UI task, Tech Lead sets `verification_mode` to `dom-only` (default, cheap) or `visual-review` (opt-in, screenshot Read). Saves vision tokens on tasks where every acceptance criterion is DOM-assertable. See `methodology/per-task-context-bundles.md#verification-mode-ui-tasks-only`.
+- **NEW Step 7.6 (AGENT + MODEL)** — per-task specialist + cost-tier model selection. Tech Lead sets `agent` (`fe-engineer` / `be-engineer`) and `model` (`opus` / `sonnet` / `haiku`) on every task. Ralph fails fast on any task missing either field. Wrong model = paying 10× more for the same work.
 
 ---
 
@@ -343,6 +344,54 @@ See `methodology/per-task-context-bundles.md#verification-mode-ui-tasks-only` fo
 
 ---
 
+## Step 7.6 — AGENT + MODEL SELECTION (per task)
+
+*Why this matters:* Ralph dispatches each task to a specialist agent directly. Two new fields on every task — `agent` and `model` — let Tech Lead choose the right specialist and the right cost tier per task. Without per-task model selection, every iteration runs Opus by default — including dumb "write a Playwright .mjs with DOM assertions" tasks where Haiku is plenty. Wrong model = paying 10× more for the same work.
+
+Run this step alongside Step 7 and 7.5 — same final pass through `prd.json`.
+
+### Agent selection
+
+- `category:functional` + schema / RLS / migration / Edge Function → `be-engineer`
+- `category:functional` + shared util / mutation hook / FE route → `fe-engineer`
+- `category:ui` (any) → `fe-engineer`
+- `category:doc-only` → no agent dispatch (Ralph handles it inline). Omit the `agent` and `model` fields.
+
+### Model selection — the cost ladder
+
+| Task profile | Model | Why |
+|---|---|---|
+| `functional` + schema design / RLS policy / judgment-heavy / ambiguous | `opus` | The decision matters; Opus is worth the cost |
+| `functional` + routine (utils, mutations, well-specced routes, Edge Functions) | `sonnet` | Default. Reliable, 3× cheaper than Opus |
+| `ui` + `verification_mode:dom-only` (Playwright .mjs + DOM assertions against locked copy) | `haiku` | 10× cheaper than Opus; plenty for spec-driven UI work |
+| `ui` + `verification_mode:visual-review` (genuine visual judgment) | `sonnet` | Vision capability needs Sonnet floor |
+| `ui` + new component composition (no precedent in codebase, ambiguous spec) | `sonnet` | Composition decisions worth Sonnet over Haiku |
+
+**Default lean:** when in doubt, drop one tier. Haiku-first for routine UI, Sonnet-first for routine functional, Opus only when the decision is genuinely judgment-heavy. The agent definition's frontmatter declares a per-agent default model — `prd.json` overrides per task.
+
+### Recording the choice
+
+Add both fields directly to the task entry in `prd.json`, right after `category` and before `description`, so they're prominent:
+
+```json
+{
+  "id": "vendor-form-ui-mobile",
+  "category": "ui",
+  "agent": "fe-engineer",
+  "model": "haiku",
+  "verification_mode": "dom-only",
+  "...": "..."
+}
+```
+
+No separate file. The fields travel with the task entry.
+
+### Validation
+
+Ralph fails fast (exit 14) if a task is missing `agent` or `model` (`doc-only` tasks excluded — they don't dispatch). PM cannot start the build until Tech Lead fills these on every non-doc-only task.
+
+---
+
 ## Anti-patterns (Tech Lead must not do)
 
 - Redesign the feature. Out of lane — that's PM/Designer.
@@ -364,5 +413,6 @@ See `methodology/per-task-context-bundles.md#verification-mode-ui-tasks-only` fo
 | `docs/features/<feature>/tasks/<task-id>.context.md` | Step 7, one per task |
 | `context_path` field in `docs/features/<feature>/prd.json` | Step 7, same commit as bundle creation |
 | `verification_mode` field on each UI task in `docs/features/<feature>/prd.json` | Step 7.5, same commit as bundle creation |
+| `agent` + `model` fields on each non-doc-only task in `docs/features/<feature>/prd.json` | Step 7.6, same commit as bundle creation |
 
 Tech Lead does not write `docs/methodology.md` — that's the converged final doc, after all three protocols align.

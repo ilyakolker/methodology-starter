@@ -2,6 +2,8 @@
   {
     "id": "vendor-table-migration",
     "category": "functional",
+    "agent": "be-engineer",
+    "model": "opus",
     "description": "Create vendors table with RLS, soft-delete column, and category FK.",
     "depends_on": [],
     "files_touched": [
@@ -19,6 +21,8 @@
   {
     "id": "vendor-form-submission-functional",
     "category": "functional",
+    "agent": "be-engineer",
+    "model": "sonnet",
     "description": "POST /vendors creates vendor row and triggers WhatsApp send.",
     "depends_on": [
       "vendor-table-migration"
@@ -39,6 +43,8 @@
   {
     "id": "vendor-form-ui-mobile",
     "category": "ui",
+    "agent": "fe-engineer",
+    "model": "haiku",
     "description": "Vendor add form at 375px — name, phone, category fields visible, ONE submit CTA.",
     "depends_on": [
       "vendor-form-submission-functional"
@@ -63,6 +69,8 @@
   {
     "id": "vendor-form-success-card-ui-mobile",
     "category": "ui",
+    "agent": "fe-engineer",
+    "model": "sonnet",
     "description": "Vendor add success card at 375px — composition matches direction-B warm mood, illustration optically aligns with confirmation copy.",
     "depends_on": [
       "vendor-form-submission-functional",

@@ -152,6 +152,8 @@ Each Ralph iteration consumes the task's pre-baked context bundle (see `methodol
 
 UI tasks additionally carry a `verification_mode` field (`dom-only` default, `visual-review` opt-in). Tech Lead sets it in Step 7.5. With `dom-only`, the .mjs DOM assertions are the verification gate and the agent does NOT Read screenshots back — vision tokens are saved on tasks where every acceptance criterion is DOM-assertable. With `visual-review`, the agent Reads every screenshot and quotes a specific visual property per screenshot, reserved for criteria that genuinely require visual judgment (composition, design-spec match, optical alignment). Missing field defaults to `dom-only`; opting into visual review is explicit.
 
+Each task also carries `agent` (`fe-engineer` or `be-engineer`) and `model` (`opus`, `sonnet`, or `haiku`). Tech Lead picks both in Step 7.6, choosing the right specialist for the task category and the cost tier matched to the work's judgment requirements. Ralph invokes the specialist directly via `claude --agent X --model Y` — no orchestrator wrapper, no subagent spawning. See `tech-lead-protocol.md#step-76-agent-model-selection` for the full guide.
+
 ---
 
 ## Linked protocol files
