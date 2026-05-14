@@ -56,7 +56,7 @@ WHAT IT DOES
   1. Reads docs/features/<feature>/prd.json.
   2. Picks the next passes:false task whose depends_on are all passes:true.
   3. Reads each task's `agent` and `model` fields, then invokes the specialist
-     directly: `claude --agent <agent> --model <model> --bare
+     directly: `claude --agent <agent> --model <model>
      --exclude-dynamic-system-prompt-sections --permission-mode acceptEdits --print`.
      No generic-orchestrator wrapper, no subagent spawning — one hop, one specialist.
   4. Loops until all tasks passed, or max-iterations, or stuck.
@@ -314,7 +314,7 @@ EOF
   log "Invoking claude --agent ${TASK_AGENT} --model ${TASK_MODEL} for ${NEXT_ID}..."
   set +e
   claude --agent "$TASK_AGENT" --model "$TASK_MODEL" \
-         --bare --exclude-dynamic-system-prompt-sections \
+         --exclude-dynamic-system-prompt-sections \
          --permission-mode acceptEdits --print "$PROMPT"
   RC=$?
   set -e
