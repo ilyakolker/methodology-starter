@@ -79,6 +79,7 @@ Does the entry, as specced, push the codebase toward any of these:
 - Type casts (`as any`, `as unknown as X`) used to bypass typing
 - Logic duplicated across FE and BE that will drift
 - New pattern that competes with an existing one in the codebase
+- Per-spec / per-file type augmentations or ambient declarations that exist or will exist in sibling files (TS projects) — hoist to a shared `.d.ts` before the build agent re-invents it
 
 If yes: either propose the refactor scope inline, or flag it as `ship-with-debt + follow-up task: <id>`. Never approve "we'll fix it later" without an actual follow-up entry being added to prd.json.
 

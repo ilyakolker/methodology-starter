@@ -28,6 +28,7 @@ A bundle is a markdown file with these sections, in this order:
 6. **Cross-cutting decisions** — entries from `decisions.md` (e.g. D1, D2...) only if they touch this task. If a decision applies project-wide but is genuinely orthogonal to this task, leave it out. Err on the side of inclusion when the task is in the affected layer.
 7. **Project rules that apply** — short, copy-pasted lines from the project's `CLAUDE.md` (or the bootstrapped equivalent) that are relevant to this task category. UI tasks get the visual / icon / RTL rules. Functional tasks get the schema / RLS / Edge Function rules. Do not paste all of `CLAUDE.md`; pick the 3-8 lines that matter for this task.
 8. **Files the agent will touch** — the exact paths from `files_touched`, annotated as "existing — edit" or "NEW: — create". This is the agent's reading list for the codebase.
+9. **Shared type augmentations / ambient declarations.** If the task uses a global API (e.g., `window.X` in TS) declared in an ambient `.d.ts` file, name the path. The agent must reference the existing declaration, never re-author one inline.
 
 ---
 
