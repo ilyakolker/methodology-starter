@@ -89,6 +89,39 @@ ARTIFACTS PER UI TASK
     dom-only      (default) .mjs DOM assertions are the gate. Agent does NOT Read the screenshots back. Cheap.
     visual-review              .mjs runs + agent Reads each screenshot and quotes one specific visual property. Opt-in, vision-token cost.
   Missing field on a task -> defaults to dom-only (backward-compatible).
+
+PRE-FLIGHT REQUIREMENTS (env vars)
+  RALPH_HEALTHCHECK_URLS     (optional) Comma-separated list of URLs that must return HTTP 200 within 3s
+                             before each iteration's agent is dispatched. If unset, the check is skipped
+                             entirely — projects without a dev server are unaffected.
+  RALPH_HEALTHCHECK_RECOVER  (optional, only meaningful when RALPH_HEALTHCHECK_URLS is set) Shell snippet
+                             to execute once on health-check failure (e.g., restart the dev server). If
+                             unset, Ralph exits 16 immediately on health-check failure.
+
+DEV-SERVER HEALTH CHECK (optional)
+  Before each iteration Ralph curls every URL in RALPH_HEALTHCHECK_URLS (comma-separated).
+  Each URL must return HTTP 200 within 3 seconds. On any failure:
+    1. Ralph runs the RALPH_HEALTHCHECK_RECOVER shell snippet once (if set).
+    2. Re-checks all URLs.
+    3. If still failing -> exit 16 with a remediation hint.
+    4. If RALPH_HEALTHCHECK_RECOVER is unset -> exit 16 immediately.
+  If RALPH_HEALTHCHECK_URLS is unset -> check is skipped (fully backward-compatible).
+
+  Worked example for a Next.js project:
+    export RALPH_HEALTHCHECK_URLS="http://localhost:3000/owner,http://localhost:3000/owner/entries"
+    export RALPH_HEALTHCHECK_RECOVER='pkill -f "next dev" ; rm -rf .next ; (npm run dev > /tmp/devserver.log 2>&1 &) ; sleep 10'
+
+EXIT CODES
+  0   All tasks passed
+  2   Agent reported STUCK
+  3   Max iterations reached
+  4   Dependency cycle / unmet deps
+  10  node not on PATH
+  11  claude CLI not on PATH
+  12  Missing required feature file
+  13  Working tree not clean
+  14  Task missing agent/model fields
+  16  Dev-server health check failed (and recovery did not restore it)
 HELP
   exit 0
 fi
@@ -111,6 +144,49 @@ ts() { date -u +%Y-%m-%dT%H:%M:%S; }
 log() { echo "[$(ts) i=${ITER}] $*"; }
 warn() { echo "[$(ts) i=${ITER}] WARN: $*" >&2; }
 err() { echo "[$(ts) i=${ITER}] ERROR: $*" >&2; }
+
+# ---------- health check ----------
+# Returns 0 if all URLs return HTTP 200 within 3s, 1 otherwise.
+# Honors RALPH_HEALTHCHECK_URLS (comma-separated). If unset, returns 0 (skip).
+health_check() {
+  if [[ -z "${RALPH_HEALTHCHECK_URLS:-}" ]]; then
+    return 0
+  fi
+  local urls failed url code
+  IFS=',' read -ra urls <<< "$RALPH_HEALTHCHECK_URLS"
+  failed=()
+  for url in "${urls[@]}"; do
+    url="${url// /}"  # trim whitespace
+    [[ -z "$url" ]] && continue
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 "$url" 2>/dev/null || echo "000")
+    if [[ "$code" != "200" ]]; then
+      failed+=("$url=$code")
+    fi
+  done
+  if [[ ${#failed[@]} -gt 0 ]]; then
+    warn "health check FAILED: ${failed[*]}"
+    return 1
+  fi
+  return 0
+}
+
+# Returns 0 if recovery ran AND health check passes after, 1 otherwise.
+attempt_recovery() {
+  if [[ -z "${RALPH_HEALTHCHECK_RECOVER:-}" ]]; then
+    warn "no RALPH_HEALTHCHECK_RECOVER hook configured — cannot auto-recover"
+    return 1
+  fi
+  log "running recovery hook: ${RALPH_HEALTHCHECK_RECOVER}"
+  bash -c "$RALPH_HEALTHCHECK_RECOVER"
+  log "recovery hook finished — re-checking health"
+  if health_check; then
+    log "recovery SUCCEEDED"
+    return 0
+  else
+    err "recovery FAILED — health still bad after running hook"
+    return 1
+  fi
+}
 
 # ---------- pre-flight ----------
 log "Pre-flight checks for feature='${FEATURE}', max_iter=${MAX_ITER}"
@@ -309,6 +385,15 @@ STUCK: print "STUCK: ${NEXT_ID} — <reason>" to stderr and exit 1 after 5+ retr
 Report (1–3 lines): what you did, what you verified, status.
 EOF
 )
+  fi
+
+  # Pre-iteration dev-server health check (no-op if RALPH_HEALTHCHECK_URLS unset)
+  if ! health_check; then
+    if ! attempt_recovery; then
+      err "dev-server health check failed and recovery did not restore it. Stopping."
+      err "Manual fix: reset your dev environment (e.g. rm -rf .next && restart npm run dev), then re-run ralph."
+      exit 16
+    fi
   fi
 
   log "Invoking claude --agent ${TASK_AGENT} --model ${TASK_MODEL} for ${NEXT_ID}..."
