@@ -154,6 +154,8 @@ UI tasks additionally carry a `verification_mode` field (`dom-only` default, `vi
 
 Each task also carries `agent` (`fe-engineer` or `be-engineer`) and `model` (`opus`, `sonnet`, or `haiku`). Tech Lead picks both in Step 7.6, choosing the right specialist for the task category and the cost tier matched to the work's judgment requirements. Ralph invokes the specialist directly via `claude --agent X --model Y` — no orchestrator wrapper, no subagent spawning. See `tech-lead-protocol.md#step-76-agent-model-selection` for the full guide.
 
+Ralph supports an optional pre-iteration health check via the `RALPH_HEALTHCHECK_URLS` env var (comma-separated list of representative routes). When set, Ralph curls each before dispatching the next agent — if any return non-200 in 3s, it runs `RALPH_HEALTHCHECK_RECOVER` (a shell snippet, typically `rm -rf .next + restart dev`) and re-checks. This catches dev-server cache corruption (common with Next.js + Playwright under sustained request load) before burning tokens on agent iterations against a broken server. See `scripts/ralph.sh --help` for env var details and worked Next.js example.
+
 ---
 
 ## Linked protocol files
