@@ -135,8 +135,20 @@ fi
 
 FEATURE="$1"
 MAX_ITER="${2:-30}"
-PRD="docs/features/${FEATURE}/prd.json"
-FEATURE_DIR="docs/features/${FEATURE}"
+
+# Auto-detect feature tree: user-facing features live under docs/features/;
+# cross-cutting infrastructure (test architecture, build tooling, etc.) lives
+# under docs/infrastructure/. Both follow the same prd.json + tasks/ contract.
+if [[ -d "docs/features/${FEATURE}" ]]; then
+  FEATURE_TREE="features"
+elif [[ -d "docs/infrastructure/${FEATURE}" ]]; then
+  FEATURE_TREE="infrastructure"
+else
+  echo "ERROR: Feature '${FEATURE}' not found under docs/features/ or docs/infrastructure/" >&2
+  exit 12
+fi
+PRD="docs/${FEATURE_TREE}/${FEATURE}/prd.json"
+FEATURE_DIR="docs/${FEATURE_TREE}/${FEATURE}"
 
 # ---------- logging ----------
 ITER=0
