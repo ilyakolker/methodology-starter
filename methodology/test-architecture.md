@@ -196,6 +196,15 @@ Patterns to mirror per project; never invent parallel modules.
 - `node e2e/<spec>.mjs` in Ralph dispatch or developer docs
 - Per-test `chromium.launch()` or `browser.newContext()` from within the spec (use `trustedPage` / `page` fixtures)
 
+## End-to-end / smoke / lifecycle "tasks" — no exceptions
+
+When a task in prd.json reads as "end-to-end smoke" or "lifecycle verification," its work is:
+- Run the full feature test suite via `npx playwright test e2e/<feature>-*.spec.ts --reporter=line`
+- If exit 0: flip passes:true and commit.
+- If failures: fix the individual failing scenario test (under its testTag isolation). NEVER create a new aggregate / mega-test file.
+
+The 25-line-per-test and 150-line-per-file rules apply to EVERY spec file, with NO exceptions for "smoke" or "end-to-end" scenarios. If a test scenario doesn't fit, split it. Period.
+
 ## Required at review
 
 When Tech Lead reviews a feature's `prd.json` and per-task bundles, every UI task brief MUST specify:
