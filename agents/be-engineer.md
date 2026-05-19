@@ -66,6 +66,20 @@ CREATE POLICY "child_select_via_parent" ON child
   );
 ```
 
+## E2E Testing — REQUIRED standard when you write functional tests
+
+When you write or modify any end-to-end test for backend routes/functions, follow `methodology/test-architecture.md`. Same rules as FE — non-negotiable:
+
+1. **Shared fixtures only.** Import from `e2e/fixtures.ts`. If you need a new BE-side fixture (e.g., a seed helper for a new table), ADD it to `fixtures.ts` (append-only).
+2. **`.spec.ts` files only — NEVER `.mjs` standalone scripts.**
+3. **testTag isolation — NEVER full-table DELETE.** Every seeded row's identifier MUST start with `testTag`. Cleanup filters by `testTag`. Without this, parallel workers race.
+4. **One scenario cluster per file.** 1-4 `test()` blocks max, ≤ ~150 lines, ≤ ~25 lines per `test()`. Kebab-case scenario-specific filenames.
+5. **Dedup before adding.** Audit existing functional specs; don't duplicate coverage.
+
+For pure API-contract tests (no browser), the same fixtures.ts pattern applies — you use the Supabase admin client + JWT-minting helpers from there, NEVER re-implement them in the spec.
+
+Read `methodology/test-architecture.md` for the full standard.
+
 ## Communication with FE Engineer
 
 You and the FE Engineer share a contract. When you build or change an API:

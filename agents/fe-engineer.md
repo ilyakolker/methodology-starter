@@ -84,6 +84,19 @@ src/
   integrations/        # API clients, third-party wrappers
 ```
 
+## E2E Testing — REQUIRED standard
+
+When you write or modify any end-to-end test, follow `methodology/test-architecture.md` strictly. Non-negotiable:
+
+1. **Shared fixtures only.** Every spec imports from `e2e/fixtures.ts`. NEVER re-implement env parsing, auth-cookie attach, DB-client construction, or JPEG/asset bytes inside a spec file. If the fixture you need doesn't exist, ADD it to `fixtures.ts` (append; don't break existing exports).
+2. **`.spec.ts` files only — NEVER `.mjs` standalone scripts.** If you find a `.mjs` test file, migrate it (or delete it if a sibling `.spec.ts` covers the same scenarios).
+3. **testTag isolation — NEVER full-table DELETE.** Every seeded row's identifier MUST start with the `testTag` fixture value. Cleanup filters by `testTag`. Without this contract, parallel workers race and tests fail randomly.
+4. **One scenario cluster per file.** 1-4 `test()` blocks max, ≤ ~150 lines per file, ≤ ~25 lines per `test()`. Kebab-case scenario-specific filenames. A reader opening any spec answers "what does this test?" in 5 seconds.
+5. **Playwright runner, not `node`.** Verify with `npx playwright test e2e/<spec>.spec.ts --grep "<test-name>" --reporter=line`. Never `node e2e/<spec>.mjs`.
+6. **Dedup before adding.** If a sibling `.spec.ts` already covers your scenarios, add `test()` blocks to it (if it fits the splitting rule) or skip the new file entirely. Don't create duplicate coverage.
+
+Read `methodology/test-architecture.md` for the full standard including code examples, forbidden patterns, and the auto-reject rules at review.
+
 ## Code Rules (Enforced)
 
 1. **No `any`** — Use `unknown` and narrow, or define proper types
