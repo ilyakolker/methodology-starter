@@ -375,11 +375,26 @@ EOF
   fi
 
   log "Invoking claude --agent ${TASK_AGENT} --model ${TASK_MODEL} for ${NEXT_ID}..."
+
+  # Live-visibility logs: stream every tool use / Read / Edit / Playwright
+  # invocation to disk so the owner can tail in a second terminal. Ralph's
+  # own stdout stays clean — only the agent's final result text comes through
+  # via scripts/ralph-stream-filter.js (matches old --print behavior).
+  #   tail -f logs/ralph-current.jsonl   # live, overwritten per task
+  #   tail -f logs/ralph-history.jsonl   # appended, full archive of every task
+  mkdir -p logs
+  : > logs/ralph-current.jsonl
+  echo "{\"_ralph\":\"task-start\",\"feature\":\"${FEATURE}\",\"task\":\"${NEXT_ID}\",\"iter\":${ITER},\"ts\":\"$(ts)\"}" >> logs/ralph-history.jsonl
+
   set +e
   claude --agent "$TASK_AGENT" --model "$TASK_MODEL" \
          --exclude-dynamic-system-prompt-sections \
-         --permission-mode acceptEdits --print "$PROMPT"
-  RC=$?
+         --permission-mode acceptEdits \
+         --output-format stream-json --verbose "$PROMPT" \
+    | tee logs/ralph-current.jsonl \
+    | tee -a logs/ralph-history.jsonl \
+    | node scripts/ralph-stream-filter.js
+  RC=${PIPESTATUS[0]}
   set -e
 
   if [[ "$RC" -eq 0 ]]; then
