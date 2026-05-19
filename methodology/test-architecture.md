@@ -205,6 +205,18 @@ When a task in prd.json reads as "end-to-end smoke" or "lifecycle verification,"
 
 The 25-line-per-test and 150-line-per-file rules apply to EVERY spec file, with NO exceptions for "smoke" or "end-to-end" scenarios. If a test scenario doesn't fit, split it. Period.
 
+## File naming convention determines project assignment
+
+Each spec file's name determines which Playwright project runs it. Each test runs ONCE in the appropriate project (never duplicated across projects):
+
+| Filename suffix | Project | Viewport |
+|---|---|---|
+| `*-functional.spec.ts` | `functional` | desktop chrome (viewport irrelevant) |
+| `*-ui-mobile.spec.ts` | `ui-mobile` | 375×812 |
+| `*-ui-desktop.spec.ts` | `ui-desktop` | 1440×900 |
+
+`playwright.config.ts` uses `testMatch` regex on each project to enforce this. Files that don't match any suffix are not run by any project — choose your suffix deliberately.
+
 ## Required at review
 
 When Tech Lead reviews a feature's `prd.json` and per-task bundles, every UI task brief MUST specify:
