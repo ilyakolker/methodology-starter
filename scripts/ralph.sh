@@ -262,17 +262,15 @@ for ((ITER=1; ITER<=MAX_ITER; ITER++)); do
     console.log((t && t.context_path) ? t.context_path : "");
   ' "$PRD" "$NEXT_ID")
 
-  if [[ -n "$CONTEXT_PATH" && -f "$CONTEXT_PATH" ]]; then
-    log "Bundle found: ${CONTEXT_PATH} — using cheap-context prompt."
-    BUNDLE_MODE=true
-  else
-    if [[ -n "$CONTEXT_PATH" ]]; then
-      warn "context_path set (${CONTEXT_PATH}) but file missing — falling back to legacy mandatory-reading prompt."
-    else
-      log "No context_path on task — falling back to legacy mandatory-reading prompt."
-    fi
-    BUNDLE_MODE=false
+  if [[ -z "$CONTEXT_PATH" ]]; then
+    err "Task ${NEXT_ID}: context_path is empty in prd.json. Per methodology, every task brief is a complete contract — Tech Lead must generate a per-task bundle (Step 7) and wire context_path before Ralph runs."
+    exit 15
   fi
+  if [[ ! -f "$CONTEXT_PATH" ]]; then
+    err "Task ${NEXT_ID}: context_path=${CONTEXT_PATH} but the bundle file is missing on disk. Tech Lead must regenerate it (Step 7)."
+    exit 15
+  fi
+  log "Bundle: ${CONTEXT_PATH}"
 
   # Extract category + verification_mode (UI-only). Default verification_mode -> dom-only when missing.
   TASK_CATEGORY=$(node -e '
@@ -315,8 +313,7 @@ for ((ITER=1; ITER<=MAX_ITER; ITER++)); do
 
   log "Task agent=${TASK_AGENT}  model=${TASK_MODEL}"
 
-  # Build the UI-verification instructions block (only injected into bundle-mode prompt).
-  # Legacy mode keeps its existing behavior unchanged.
+  # Build the UI-verification instructions block.
   # For non-UI tasks (functional, doc-only), the block is a no-op blank line.
   if [[ "$TASK_CATEGORY" != "ui" ]]; then
     UI_VERIFY_BLOCK=''
@@ -327,8 +324,7 @@ for ((ITER=1; ITER<=MAX_ITER; ITER++)); do
     UI_VERIFY_BLOCK='   - category:ui (verification_mode=dom-only) — Playwright at the specified viewport via the .mjs script. The .mjs MUST run DOM assertions (text content, attributes, computed styles, element counts, focus state, navigation, getBoundingClientRect, ARIA roles, presence/absence). The .mjs captures screenshots to screenshots/<task-id>/<viewport>.png for on-disk human review. You DO NOT Read the screenshots back via the Read tool — that step is intentionally skipped to save vision tokens. The gate is: .mjs exits 0 AND every screenshot file exists on disk AND every DOM assertion in the steps array fires. NEGATIVE checks ("verify X is ABSENT at this viewport") are first-class — encode them as DOM assertions in the .mjs.'
   fi
 
-  if [[ "$BUNDLE_MODE" == "true" ]]; then
-    PROMPT=$(cat <<EOF
+  PROMPT=$(cat <<EOF
 RALPH ITERATION — feature ${FEATURE}, task ${NEXT_ID}
 
 The loop driver (shell) picked this task — it is the highest-priority passes:false task whose depends_on are satisfied. Execute, do not question priority order.
@@ -356,36 +352,6 @@ If you genuinely cannot finish (>5 internal retries on the same verification ste
 Report at the end (1–3 lines): what you did, what you verified, status. If the bundle was incomplete, note exactly what was missing.
 EOF
 )
-  else
-    PROMPT=$(cat <<EOF
-RALPH ITERATION — feature ${FEATURE}, task ${NEXT_ID}
-
-LEGACY MODE — no per-task bundle. Mandatory reading (every invocation):
-1. docs/features/${FEATURE}/why.md
-2. docs/features/${FEATURE}/spec.md
-3. docs/features/${FEATURE}/flow.md (and flow.png if relevant)
-4. docs/features/${FEATURE}/prd-review.md — your task's section. Tech Lead's files_touched + clarifications are authoritative.
-5. docs/features/${FEATURE}/decisions.md (skip if absent)
-6. docs/features/${FEATURE}/prd.json — find id="${NEXT_ID}"
-7. CLAUDE.md
-
-YOUR JOB
-1. Implement using Tech Lead's files_touched (existing = edit, NEW: = create).
-2. Verify every step in steps[]:
-   - category:functional — DB / API / Edge Function / integration assertions.
-   - category:ui — Playwright at the specified viewport. Take screenshots, READ them with the Read tool, verify visual assertions. NEGATIVE checks ("verify X is ABSENT at this viewport") are first-class — do not skip.
-3. Set passes:true on YOUR task ONLY in prd.json.
-4. git add code + prd.json. Commit: feat(${FEATURE}/${NEXT_ID}): <one-line>
-5. Exit cleanly.
-
-SCOPE — LOCAL ONLY (no remote push/deploy/git push).
-
-STUCK: print "STUCK: ${NEXT_ID} — <reason>" to stderr and exit 1 after 5+ retries on the same step.
-
-Report (1–3 lines): what you did, what you verified, status.
-EOF
-)
-  fi
 
   # Pre-iteration dev-server health check (no-op if RALPH_HEALTHCHECK_URLS unset)
   if ! health_check; then
