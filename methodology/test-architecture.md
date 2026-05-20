@@ -196,14 +196,23 @@ Patterns to mirror per project; never invent parallel modules.
 - `node e2e/<spec>.mjs` in Ralph dispatch or developer docs
 - Per-test `chromium.launch()` or `browser.newContext()` from within the spec (use `trustedPage` / `page` fixtures)
 
-## End-to-end / smoke / lifecycle "tasks" — no exceptions
+## End-to-end / smoke / lifecycle tasks DO NOT belong in prd.json
 
-When a task in prd.json reads as "end-to-end smoke" or "lifecycle verification," its work is:
-- Run the full feature test suite via `npx playwright test e2e/<feature>-*.spec.ts --reporter=line`
-- If exit 0: flip passes:true and commit.
-- If failures: fix the individual failing scenario test (under its testTag isolation). NEVER create a new aggregate / mega-test file.
+PM and Tech Lead MUST NOT add tasks whose only work is "run the full test suite," "verify the lifecycle end-to-end," or any equivalent. Reject them at PRD authoring + at PRD review.
 
-The 25-line-per-test and 150-line-per-file rules apply to EVERY spec file, with NO exceptions for "smoke" or "end-to-end" scenarios. If a test scenario doesn't fit, split it. Period.
+**Why:** when individual scenario tests are thorough (per this architecture doc), a lifecycle task adds:
+- Latency (reruns ~all the same tests that other tasks already ran)
+- False failures (suite includes tests of features built by OTHER tasks; if those haven't shipped yet, the lifecycle task fails)
+- Dependency-graph complexity (lifecycle must depend on every other task in the feature; one missing edge breaks Ralph)
+- An extra Ralph iteration with no new code shipped
+
+**Where suite-passing verification belongs:** CI workflows (`.github/workflows/`), pre-push hooks, or manual `npm run test:<feature>` scripts. NOT in prd.json. NOT a Ralph task.
+
+**Each per-task `.spec.ts` is the source of truth.** When every per-task `passes:true` is flipped, the feature is shipped. No additional gate.
+
+**Cross-task seam bugs** (the rare value a lifecycle catches) are addressed by adding a `test()` block to the affected feature's existing spec file, NOT by a separate aggregate task.
+
+**Rule check at PRD review (Tech Lead):** scan prd.json task IDs for `*lifecycle*`, `*smoke*`, `*end-to-end*`, `*verify-suite*`. Any match → reject the task. Push back: "what NEW code or test does this task add? If none, delete it."
 
 ## File naming convention determines project assignment
 
