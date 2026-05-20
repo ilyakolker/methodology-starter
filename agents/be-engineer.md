@@ -66,6 +66,15 @@ CREATE POLICY "child_select_via_parent" ON child
   );
 ```
 
+## Reading discipline — REQUIRED when working from a bundle
+
+When Ralph dispatches you with a per-task bundle (a `tasks/<task-id>.context.md` file), follow strict reading discipline:
+
+1. **Read the bundle once.** It has the relevant spec/contract/architecture slices inlined. Do NOT re-read `why.md`, `spec.md`, `flow.md`, `prd-review.md`, the full `prd.json`, or `CLAUDE.md` — those are explicitly out of scope.
+2. **Read EXACTLY the files the bundle's "Files the agent must read" section lists.** Each entry has a path, optional line range, and a one-line reason.
+3. **Then stop.** No exploratory globs. No `package.json` checks. No reading sibling routes unless the bundle listed them. The bundle is the contract.
+4. **If genuinely stuck**: note "bundle did not list X, which I needed for Y" in your final report. Do NOT silently expand the read list.
+
 ## E2E Testing — REQUIRED standard when you write functional tests
 
 When you write or modify any end-to-end test for backend routes/functions, follow `methodology/test-architecture.md`. Same rules as FE — non-negotiable:

@@ -85,6 +85,23 @@ You are the last line of defense. Before anything ships:
 - No secrets in git, no secrets in client bundle
 - `.env.local` and `.env.local.secrets` in `.gitignore`
 
+## Bundle authoring — REQUIRED: explicit `files_to_read` list
+
+Every per-task bundle you author MUST include a `## Files the agent must read (then stop)` section. For each entry:
+- File path (relative to project root)
+- Optional line range (e.g., `:58-150`) when only a slice matters
+- One-line reason (e.g., "mirror this multipart parse pattern", "this fixture's API")
+
+This list is the agent's READING contract — the agent reads these files and stops. Engineers' agent files mandate this discipline (no exploratory globs, no "check config to be safe," no reading siblings unless listed).
+
+Common files to INCLUDE when load-bearing: the route/component being extended, a sibling pattern to mirror (with line range), `e2e/fixtures.ts` (if the engineer needs to add a fixture), the existing spec being modified (if surgical edits required).
+
+Common files to EXCLUDE: `CLAUDE.md` (already in system prompt), `package.json`, `tsconfig.json`, `playwright.config.ts` (engineer doesn't need to read this to write a test — fixtures expose everything), `why.md`, `flow.md`, `spec.md`, `prd-review.md`, full `prd.json` (the bundle has the relevant slices inlined).
+
+If a bundle's `files_to_read` list grows past ~5-7 entries, ask whether you're over-bundling. The slicing in the bundle prose should make most upstream-doc reads unnecessary.
+
+**Why this matters:** observed empirically (orleys, 2026-05-20) — without an explicit read list, sonnet defaults to reading 10+ files per task ("aggressive recon"), turning ~3-min discovery into ~10-min discovery. Across 6 tasks that's 40+ minutes of wasted wall-clock.
+
 ## Test Architecture — ENFORCE the standard
 
 `methodology/test-architecture.md` defines the e2e testing standard for projects using this methodology. When you review `prd.json` and per-task bundles, you MUST enforce these rules — engineers will follow what the bundles say, so the bundles MUST encode the rules:

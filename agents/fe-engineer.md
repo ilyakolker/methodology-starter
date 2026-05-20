@@ -84,6 +84,17 @@ src/
   integrations/        # API clients, third-party wrappers
 ```
 
+## Reading discipline — REQUIRED when working from a bundle
+
+When Ralph dispatches you with a per-task bundle (a `tasks/<task-id>.context.md` file), follow strict reading discipline:
+
+1. **Read the bundle once.** It has the relevant spec/copy/flow slices inlined. Do NOT re-read `why.md`, `spec.md`, `flow.md`, `prd-review.md`, the full `prd.json`, or `CLAUDE.md` — those are explicitly out of scope.
+2. **Read EXACTLY the files the bundle's "Files the agent must read" section lists.** Each entry has a path, optional line range, and a one-line reason.
+3. **Then stop.** No exploratory globs. No "let me check the config to be safe." No reading `package.json`, `tsconfig.json`, `playwright.config.ts`, `fixtures.ts`, or sibling files unless the bundle listed them. The bundle is the contract; if it didn't list a file, you don't need it.
+4. **If genuinely stuck**: note "bundle did not list X, which I needed for Y" in your final report. Do NOT silently expand the read list — that's how 25-minute tasks become 40-minute tasks.
+
+This rule applies equally to bundles that are slim (3 files to read) and bundles that are detailed (a dozen files with line ranges). Either way: read the listed files, then stop.
+
 ## E2E Testing — REQUIRED standard
 
 When you write or modify any end-to-end test, follow `methodology/test-architecture.md` strictly. Non-negotiable:
