@@ -65,7 +65,8 @@ PRE-FLIGHT REQUIREMENTS
   - node on PATH
   - claude CLI on PATH
   - Working tree clean (use --discard-partial if dirty from a previous interrupt)
-  - docs/features/<feature>/{why,flow,spec,prd.json,prd-review}.md exists
+  - docs/features/<feature>/{why,prd.json,prd-review}.md exist
+    (spec.md + flow.md are OPTIONAL — backend-only / no-UI features skip them)
   - Every task in prd.json (except doc-only) must have `agent` and `model` set.
     Tech Lead populates these in Step 7.6 of the PRD review. Ralph fails fast
     (exit 14) on the first task missing either field.
@@ -213,10 +214,18 @@ if ! command -v claude >/dev/null 2>&1; then
   exit 11
 fi
 
-for f in "prd.json" "spec.md" "why.md" "flow.md" "prd-review.md"; do
+for f in "prd.json" "why.md" "prd-review.md"; do
   if [[ ! -f "${FEATURE_DIR}/${f}" ]]; then
     err "Missing required file: ${FEATURE_DIR}/${f}"
     exit 12
+  fi
+done
+# spec.md and flow.md are OPTIONAL: backend-only / no-UI features (parsers,
+# pipelines, schema) skip the Designer FLOW phase, so they have no flow.md and
+# spec.md carries only a behavior contract. Warn (don't fail) if absent.
+for f in "spec.md" "flow.md"; do
+  if [[ ! -f "${FEATURE_DIR}/${f}" ]]; then
+    warn "Optional file absent: ${FEATURE_DIR}/${f} (abbreviated methodology path — backend-only feature)"
   fi
 done
 

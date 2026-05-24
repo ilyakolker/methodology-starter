@@ -138,6 +138,14 @@ If the owner's request is a typo, a copy adjustment, a single-line bug fix, or a
 
 ---
 
+## Backend-only features (no UI)
+
+Some features have no screens — parsers, data pipelines, ingestion, schema, background jobs. For these the Designer FLOW phase is **skipped**: there is no `flow.md`, and `spec.md` (if present) carries only the behavior contract, no visual section. The pipeline is PM (`why.md`) → PM SPEC/PRD (`prd.json`, all `category: "functional"`) → Tech Lead review → build.
+
+`scripts/ralph.sh` reflects this: it **hard-requires only `why.md`, `prd.json`, `prd-review.md`**, and treats `spec.md` and `flow.md` as optional (it warns instead of failing when they're absent). So a backend-first project can run the build loop without ever producing a flow document.
+
+---
+
 ## Big feature decomposition
 
 If during PROPOSAL or Q&A it becomes clear a feature is too big to fit one why.md / flow.md / spec.md without becoming a novel, PM declares decomposition: emits sub-feature names back to the owner, and each sub-feature gets its own `feature-plan: <subname>` intake from the owner. Decomposition lives at PM level — Designer and Tech Lead never receive a 50-screen flow.md. If it's that big, it should have been multiple features.
